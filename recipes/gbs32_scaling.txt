@@ -1,0 +1,10 @@
+# Strong scaling at a fixed global batch of 32 (Cisco v6.0 H200 hyperparameters).
+# Beyond 32 GPUs, DP is capped at 32 and the extra GPUs go to CP/TP.
+1   TP=2 TIME=12:00:00
+2
+4
+8
+16  CP=2 TIME=01:20:00
+32  CP=4 TIME=01:00:00
+64  TP=2 CP=4 TIME=00:50:00
+128 TP=4 CP=4 TIME=00:45:00

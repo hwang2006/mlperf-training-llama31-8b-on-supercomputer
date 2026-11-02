@@ -1,0 +1,2 @@
+# 200 steps on 4 nodes: checks container, data mounts, CXI, memory and step time (~6 min).
+4 MAX_STEPS=200 TIME=00:40:00 NCCL_DEBUG=INFO

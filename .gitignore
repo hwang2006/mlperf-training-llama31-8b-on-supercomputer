@@ -1,0 +1,11 @@
+third_party/
+hostlibs/
+ofi-plugin/
+results/runs/*
+!results/runs/.gitkeep
+results/*.log
+results/nccl-*/
+results/nodes_*.txt
+results/*suspects*.txt
+*.sqsh
+__pycache__/

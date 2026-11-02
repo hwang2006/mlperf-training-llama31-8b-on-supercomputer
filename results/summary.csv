@@ -1,0 +1,28 @@
+job_id,nodes,gpus,gbs,tp,cp,minibs,lr,warmup_steps,netprofile,status,ttt_min,samples_to_target,final_log_ppl,train_samples_per_s,avg_samples_per_s,notes
+1194646,1,4,32,2,1,16,0.0004,20,base,success,683.68,208896,3.2722,5.24,5.09,TP1 runs out of GPU memory (96 GB) on 1 node
+1194558,2,8,32,1,1,4,0.0004,20,base,success,269.92,196608,3.2949,12.44,12.14,
+1195953,2,8,32,1,1,4,0.0004,20,cscs,success,275.30,196608,3.2787,12.38,11.90,
+1194559,4,16,32,1,1,2,0.0004,20,base,success,140.55,196608,3.2783,23.88,23.31,
+1195777,4,16,32,1,1,2,0.0004,20,cscs,success,140.76,196608,3.2822,23.87,23.28,
+1195778,8,32,32,1,1,1,0.0004,20,cscs,success,74.67,196608,3.2818,44.95,43.88,
+1195779,16,64,32,1,2,1,0.0004,20,cscs,success,43.40,196608,3.2897,77.21,75.50,
+1195780,32,128,32,1,4,1,0.0004,20,cscs,success,29.20,196608,3.2866,115.06,112.23,
+1196783,64,256,32,2,4,1,0.0004,20,cscs-nordzv,success,25.89,184320,3.2966,123.28,118.64,suspect node set A excluded
+1194891,128,512,32,4,4,1,0.0004,20,base,success,34.88,184320,3.2900,90.17,88.08,
+1196664,128,512,32,4,4,1,0.0004,20,cscs-nordzv,success,39.90,196608,3.2756,84.17,82.12,
+1197902,32,128,64,1,2,1,0.0008,64,cscs-nordzv,success,24.94,221184,3.2808,152.55,147.82,
+1197903,64,256,64,1,4,1,0.0008,64,cscs-nordzv,success,19.72,233472,3.2927,204.40,197.32,
+1198603,64,256,64,1,4,1,0.0008,64,cscs,success,19.14,221184,3.2858,206.36,192.58,best TTT
+1198886,64,256,64,4,1,1,0.0008,64,cscs,success,19.64,221184,3.2839,193.35,187.70,TP4 vs CP4 comparison
+1197928,128,512,64,2,4,1,0.0008,64,cscs-nordzv,success,20.54,221184,3.2989,188.87,179.45,
+1199958,64,256,128,1,2,1,0.002,256,cscs,success,22.39,368640,3.2867,282.83,274.42,MLPerf RCP hyperparameters for GBS 128
+1200147,256,1024,128,4,2,1,0.002,256,cscs-nordzv,success,29.56,344064,3.2966,199.00,193.98,MLPerf RCP hyperparameters for GBS 128
+1194557,1,4,32,1,1,8,0.0004,20,base,oom,,,,,,CUDA OOM before run_start
+1198306,128,512,128,1,4,1,0.0008,64,cscs-nordzv,hang,,,,235.26,228.32,LR too low for GBS 128 (3.47 at 245760 samples) then hung
+1198647,256,1024,64,4,4,1,0.0008,64,cscs,nan,,,,,,NaN from first step (cross-node CP)
+1199107,256,1024,64,4,4,1,0.0008,64,cscs-nordzv,nan,,,,,,NaN from first step (cross-node CP)
+1199558,64,256,128,1,4,2,0.0004,20,cscs,throughput-only,,,,229.39,,300 steps
+1199551,256,1024,256,1,4,1,0.0004,20,cscs,throughput-only,,,,270.70,,300 steps completed
+1199782,256,1024,512,1,4,2,0.0004,20,cscs,throughput-only,,,,436.59,,hung after 64 steps
+1199866,256,1024,1024,1,4,4,0.0004,20,cscs,throughput-only,,,,705.46,,hung after 32 steps
+1199960,256,1024,128,4,2,1,0.002,256,cscs-nordzv,throughput-only,,,,200.03,,100 steps completed
