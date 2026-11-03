@@ -2,12 +2,16 @@
 
 Reproducible recipe for the **MLPerf Training Llama 3.1 8B pretraining** benchmark on KISTI's
 6th supercomputer **Hangang** (NVIDIA GH200, HPE Slingshot), using the NVIDIA MLPerf Training
-v6.0 implementation, from 1 node (4 GPUs) to 256 nodes (1,024 GPUs).
+v6.0 implementation, from 1 node (4 GPUs) to 512 nodes (2,048 GPUs).
 
-**Best time-to-train: 19.1 min on 64 nodes (256 GH200).** Every scale from 1 to 256 nodes
-reached the MLPerf quality target (validation log perplexity < 3.3).
+**Best time-to-train: 13.8 min on 128 nodes (512 GH200)** with the MLPerf evaluation schedule.
+Every scale from 1 to 512 nodes reached the MLPerf quality target (validation log perplexity < 3.3).
 
-![TTT and throughput per node count](docs/img/ttt_and_throughput.png)
+![Track 1 vs Track 2](docs/img/ttt_tracks.png)
+
+Results come in two tracks with the same stop condition: **Track 1** keeps the MLPerf evaluation
+schedule (every 12,288 samples) and GBS ≤ 128; **Track 2** allows any global batch and evaluation
+schedule. See [docs/RESULTS.md](docs/RESULTS.md).
 
 > Unofficial results: single runs, not reviewed by MLCommons. See [docs/RESULTS.md](docs/RESULTS.md).
 
@@ -17,9 +21,9 @@ Companion repositories:
 [kisti-neuron-mlperf-training](https://github.com/hwang2006/kisti-neuron-mlperf-training)
 (reference implementation on NEURON).
 
-More nodes need a larger global batch to raise throughput, and above GBS 64 the extra
-samples needed to converge outgrow the speedup, so 64 nodes is the sweet spot
-([docs/RESULTS.md](docs/RESULTS.md)).
+More nodes need a larger global batch to keep tensor/context parallelism inside a node, and
+above GBS 128 the samples needed to converge grow almost as fast as the batch, so 128 nodes
+is the sweet spot ([docs/RESULTS.md](docs/RESULTS.md)).
 
 ## The benchmark in one paragraph
 
@@ -95,7 +99,8 @@ for a `MAX_STEPS` run.
 ### 5. Time-to-train runs
 
 ```bash
-./submit.sh 64 GBS=64 CP=4 LR=0.0008 WARMUP_STEPS=64 TIME=00:50:00     # best: ~19 min
+./submit.sh 128 GBS=128 TP=1 CP=4 LR=0.001 WARMUP_STEPS=256 BUCKET_SIZE=2000000000 \
+            MAX_STEPS=1200000 TIME=00:40:00 NETPROFILE=cscs      # best: ~14 min
 setsid nohup ./scripts/submit_queue.sh recipes/best_per_scale.txt > results/queue.log 2>&1 < /dev/null &
 ```
 
@@ -112,6 +117,7 @@ stops for 5 minutes, which is how collective hangs show up on this system.
 squeue -u $USER
 python3 tools/ttq_status.py --summary results/runs/kv6-l8b-*.out     # TTT, samples, last eval, throughput
 python3 tools/ttq_status.py results/runs/kv6-l8b-<job>.out           # eval curve of one run
+python3 tools/collect_runs.py results/runs --sacct                    # all runs -> results/raw/ (commit)
 tail -n2 results/watch_<job>.log                                     # watchdog verdict
 ```
 
@@ -129,8 +135,10 @@ submit.sh NODES KEY=VALUE…  →  sbatch slurm/run_ttq.sbatch  (+ tools/watch_j
 |---|---|
 | `GBS`, `TP`, `CP`, `MBS` | Global batch and parallelism; `GBS = MINIBS × 4·nodes / (TP·CP)` |
 | `LR`, `WARMUP_STEPS` | Base LR and warmup steps (defaults 4e-4 and 20, the Cisco GBS 32 values) |
-| `MAX_STEPS`, `VAL_CHECK_INTERVAL` | Short tests; evaluation defaults to every 12,288 samples. `MAX_STEPS` is capped automatically for GBS ≥ 128 |
-| `EVAL_START`, `EVAL_EVERY` | Non-MLPerf evaluation schedule in samples (first evaluation, then interval) |
+| `MAX_STEPS`, `VAL_CHECK_INTERVAL` | Short tests; evaluation defaults to every 12,288 samples. `MAX_STEPS` is capped at 4M samples for GBS ≥ 128 |
+| `EVAL_START`, `EVAL_EVERY` | Track 2 evaluation schedule in samples (first evaluation, then interval) |
+| `BUCKET_SIZE` | Parameters per gradient bucket (default 768,000,000); 2,000,000,000 helps with TP=1 and at DP ≥ 128 |
+| `TP_COMM_OVERLAP`, `NUM_DISTOPT_INSTANCES`, `OVERLAP_PG_OPTIM` | Further NVIDIA knobs; none helped on Hangang (docs/RESULTS.md) |
 | `NETPROFILE` | CXI environment: `cscs-nordzv` (default), `cscs`, `cscs-rdzv`, `base` |
 | `TIME`, `SEED`, `NCCL_DEBUG`, `WATCH=0`, `STALL=<min>` | Slurm time limit, seed, NCCL logging, watchdog control |
 
@@ -145,6 +153,8 @@ Summary of [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md); the scripts alrea
 5. Some nodes produced NaN loss in runs with context parallelism across nodes; they are excluded in `env.sh`.
 6. One node needs TP=2 (96 GB GPUs); builds on login nodes need `OPENBLAS_NUM_THREADS=1`.
 7. GBS ≥ 256 timed out during initialisation (dataset index for `MAX_STEPS × GBS` samples); `MAX_STEPS` is now capped.
+8. One hang came with CXI `UNDELIVERABLE` send errors from three neighbouring nodes; they are excluded.
+9. The best layout changes with scale: CP-heavy up to 128 nodes, TP4 with large gradient buckets from 256 nodes.
 
 ## Repository layout
 
@@ -159,8 +169,8 @@ scripts/submit_queue.sh        submit a recipe file within the 5-job limit
 container/                     build steps run inside enroot
 recipes/                       validated commands and hyperparameters
 tools/                         log parser, status, watchdog, plots, Cisco baseline
-results/summary.csv            all measured runs
-results/eval_curves.csv        evaluation curves used in docs/RESULTS.md
+results/summary.csv            curated table of the runs in docs/RESULTS.md
+results/raw/                   every job: configuration, status, curves, MLPerf log lines (results/README.md)
 docs/                          results, troubleshooting, Korean quick guide
 ```
 

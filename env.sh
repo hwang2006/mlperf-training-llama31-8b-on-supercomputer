@@ -39,9 +39,10 @@ export SLURM_COMMENT="field=efficientai;appl=megatron-lm"   # REQUIRED on Hangan
 # Nodes that broke multi-node runs on Hangang (2026-11-02; see docs/TROUBLESHOOTING.md):
 #   NaN from the first step (cross-node CP runs): node0320-0324, node0541, node0739 (set A)
 #   and node0104,0130,0334,0543,0752,0753,0846,0847,0849,1004,1048,1049,1083,1151 (set B);
-#   "Error configuring interconnect": node0943; precautionary: node0316, node1119, node1125.
+#   "Error configuring interconnect": node0943; CXI UNDELIVERABLE send errors (2026-11-03): node0113-0115;
+#   precautionary: node0316, node1119, node1125.
 # Re-check with the system team before relying on this list; empty it to use all nodes.
-export EXCLUDE_NODES="node0316,node1119,node1125,node0943,node0320,node0321,node0322,node0323,node0324,node0541,node0739,node0104,node0130,node0334,node0543,node0752,node0753,node0846,node0847,node0849,node1004,node1048,node1049,node1083,node1151"
+export EXCLUDE_NODES="node0316,node1119,node1125,node0943,node0320,node0321,node0322,node0323,node0324,node0541,node0739,node0104,node0130,node0334,node0543,node0752,node0753,node0846,node0847,node0849,node1004,node1048,node1049,node1083,node1151,node0113,node0114,node0115"
 
 # --- Enroot (build on a login node; temp/data must be node-local + exec-able) --
 export ENROOT_CACHE_PATH=/scratch/$USER/enroot-tmp/cache

@@ -14,6 +14,7 @@ scripts; this page explains what to look for if you adapt them.
 | 7 | CUDA OOM on 1 node | 96 GB GPU; optimizer state over 4 DP ranks only | `TP=2` on 1 node |
 | 8 | Container build dies with `KeyboardInterrupt` | Login-node thread limit hit by OpenBLAS | `OPENBLAS_NUM_THREADS=1` in the build |
 | 9 | GBS ≥ 256 dies before `run_start` with NCCL `checkTimeout` | Rank 0 builds a dataset index for `MAX_STEPS × GBS` samples | `MAX_STEPS` capped automatically for GBS ≥ 128 |
+| 10 | Hang preceded by `NET/OFI Request ... completed with error ... (UNDELIVERABLE)` | CXI could not deliver messages between specific nodes | Exclude the reporting nodes; report time and nodes to the system team |
 
 ## 1. aws-ofi-nccl in NGC 26.04 does not work on Slingshot
 
@@ -86,6 +87,7 @@ in the allocation, not the CXI profile:
 - Set A: node0320-0324, node0541, node0739 were in all four 64-node NaN runs and in no passing
   64-node run; excluding them made the same configuration pass.
 - Set B: 14 nodes were in both 256-node NaN runs and in none of ~25 passing jobs (560 nodes).
+- With both sets excluded, 34 jobs on 2026-11-03 (64–512 nodes, CP up to 8 across nodes) had no NaN.
 
 Both sets plus node0943 and three precautionary nodes are in `EXCLUDE_NODES` in `env.sh`. The
 system team has been asked to check them; Slurm still shows them as healthy. If you must run CP
@@ -121,12 +123,41 @@ an instance of 'c10::DistBackendError'` from `ProcessGroupNCCL.cpp ... checkTime
 training, rank 0 builds the shuffled sample index for `MAX_STEPS × GBS` samples while the other
 ranks wait in a collective. With MLPerf's 1.2M steps that is 38M samples at GBS 32 (init ~1.5
 min), 154M at GBS 128 (~5 min) and 307M at GBS 256 (>10 min, the NCCL timeout).
-`configs/config_GH200_8b.sh` now sets `MAX_STEPS = 2,000,000 / GBS` for GBS ≥ 128; the LR decay
+`configs/config_GH200_8b.sh` now sets `MAX_STEPS = 4,000,000 / GBS` for GBS ≥ 128; the LR decay
 length stays at 1.2M steps, so training is unchanged. Override with `MAX_STEPS=<steps>`.
+The cap was first 2M samples, which would have stopped GBS 1,024 (~2M samples to target) short
+of the target; keep the cap well above the samples a run needs.
+
+## 10. CXI delivery errors before a hang
+
+Job 1205461 (64 nodes, 2026-11-03 14:47:42) stopped after these warnings, then the watchdog
+cancelled it five minutes later:
+
+```
+NET/OFI Request ... completed with error. RC: 113. Error: 2 (UNDELIVERABLE) ... direction: SEND
+NET/OFI Request ... completed with error. RC: 5. Error: 53 (CONN_CLOSED) ... direction: SEND
+```
+
+They came from node0113 (GPU 0), node0114 (GPU 2) and node0115 (GPU 1), three consecutive
+nodes on different NICs, which points at a shared switch or link. The three nodes are now in
+`EXCLUDE_NODES`. Count these warnings when a run stalls:
+
+```bash
+grep -c 'NCCL WARN NET/OFI Request' results/runs/kv6-l8b-<job>.out
+grep 'NCCL WARN NET/OFI Request' results/runs/kv6-l8b-<job>.out | grep -oE 'node[0-9]+' | sort | uniq -c
+```
+
+## Options that fail with this software stack
+
+| Option | Error |
+|---|---|
+| `FP8_ATTN=1` with CP > 1 | `ValueError: No dot product attention backend is available for the provided inputs` |
+| `OVERLAP_PG_OPTIM=True` | `IndexError: list index out of range` at init |
 
 ## Other Hangang notes
 
 - Five submitted jobs per user (`QOSMaxSubmitJobPerUserLimit`): use `scripts/submit_queue.sh`.
+- Heavy use lowers your fair-share and job priority (`sshare -U -u $USER`); large jobs then wait longer.
 - `squeue` shows only your own jobs. Free nodes: `sinfo -p normal -h -o "%t %D" | awk '$1=="idle"'`
   (`sinfo -t idle` also counts drained and planned nodes).
 - The container needs CUDA forward compatibility (driver 570.124.06 vs CUDA 13.2). It works on

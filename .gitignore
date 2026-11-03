@@ -11,3 +11,4 @@ results/*suspects*.txt
 __pycache__/
 patches/
 ._dbindex_/
+results/queue_*.txt

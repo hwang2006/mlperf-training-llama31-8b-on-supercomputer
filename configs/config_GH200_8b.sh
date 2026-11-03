@@ -18,7 +18,12 @@ export CONTEXT_PARALLEL=${OV_CP:-1}
 export PIPELINE_MODEL_PARALLEL=1
 export INTERLEAVED_PIPELINE=null
 if [ "$TENSOR_MODEL_PARALLEL" -gt 1 ]; then export SEQ_PARALLEL=True; else export SEQ_PARALLEL=False; fi
-export TP_COMM_OVERLAP=False
+export TP_COMM_OVERLAP=${OV_TP_COMM_OVERLAP:-False}      # True uses conf/tp_overlap/h100tp${TP}mbs${MBS}.yaml (tp4/tp8 only)
+[ -n "${OV_NUM_DISTOPT_INSTANCES:-}" ] && export NUM_DISTOPT_INSTANCES=$OV_NUM_DISTOPT_INSTANCES
+# BUCKET_SIZE counts parameters per gradient bucket (NVIDIA 8B default 768,000,000).
+# On Hangang 2,000,000,000 is faster with TP=1 and slower with TP>=2 (docs/RESULTS.md).
+[ -n "${OV_BUCKET_SIZE:-}" ] && export BUCKET_SIZE=$OV_BUCKET_SIZE
+[ -n "${OV_OVERLAP_PG_OPTIM:-}" ] && export OVERLAP_PARAM_GATHER_WITH_OPTIM_STEP=$OV_OVERLAP_PG_OPTIM
 export MICRO_BATCH_SIZE=${OV_MBS:-1}
 
 # GBS = MINIBS * DP,  DP = 4*N / (TP*CP)
@@ -37,9 +42,10 @@ export VAL_CHECK_INTERVAL=${OV_VAL_CHECK_INTERVAL:-$(( (12288 + GBS - 1) / GBS )
 # Smoke tests only (changes nothing else; LR decay stays at 1.2M steps)
 # MAX_STEPS sizes the dataset index rank 0 builds before training. With the MLPerf value
 # (1.2M steps) a GBS of 256 needs >10 min and the other ranks hit the NCCL timeout, so for
-# GBS >= 128 cap it at 2M samples (5x what GBS 128 needs). LR decay still uses 1.2M steps.
+# GBS >= 128 cap it at 4M samples (GBS 1024 needs ~2M; the index for 4M builds in seconds).
+# LR decay still uses 1.2M steps, so training is unchanged.
 if [ -n "${OV_MAX_STEPS:-}" ]; then export MAX_STEPS=$OV_MAX_STEPS
-elif [ "$GBS" -ge 128 ]; then export MAX_STEPS=$(( 2000000 / GBS )); fi
+elif [ "$GBS" -ge 128 ]; then export MAX_STEPS=$(( 4000000 / GBS )); fi
 # Non-MLPerf evaluation schedule: first eval near EVAL_START samples, then every EVAL_EVERY
 # samples (needs patches/callback_logging.py, created by scripts/00_fetch_sources.sh)
 if [ -n "${OV_EVAL_EVERY:-}" ]; then

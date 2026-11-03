@@ -1,126 +1,145 @@
 # Results on Hangang (KISTI 6th supercomputer)
 
-All runs reached the MLPerf Training Llama 3.1 8B target (validation log perplexity < 3.3)
-with the NVIDIA MLPerf Training v6.0 implementation, FP8 (hybrid, tensorwise) on GH200 96 GB.
-Measured 2026-11-01/02. Raw numbers: [`results/summary.csv`](../results/summary.csv);
-plots regenerate with `python3 tools/plot_results.py`.
+MLPerf Training Llama 3.1 8B with the NVIDIA MLPerf Training v6.0 implementation, FP8 (hybrid,
+tensorwise) on GH200 96 GB, measured 2026-11-01 to 11-03. All runs are single runs and none is
+an MLPerf-reviewed result. Raw data: [`results/summary.csv`](../results/summary.csv) (column
+`eval_schedule` tells the tracks apart); plots regenerate with `python3 tools/plot_results.py`.
 
-**Best: 19.14 min on 64 nodes (256 GH200), GBS 64, CP4.** Single runs, not MLPerf-reviewed
-results; an official score averages 10 runs.
+## Two tracks
 
-![best TTT per node count](img/ttt_best_per_scale.png)
+| | Track 1: MLPerf evaluation rules | Track 2: relaxed |
+|---|---|---|
+| Stop condition | validation log perplexity < 3.3 on the same 1,024 C4 sequences | **same** |
+| Evaluation | every 12,288 samples, counted in TTT | any schedule (late start, dense near the target) |
+| Global batch | ≤ 128 (MLPerf has reference convergence points up to 128) | any |
+| LR, warmup, parallelism, buckets, network | free, as in MLPerf | free |
+| `eval_schedule` in the CSV | `mlperf` | `relaxed` |
+
+Track 1 is *not* a compliant submission: a submission needs 10 runs, the reference convergence
+(RCP) check and MLCommons review. Our GBS 128 runs use LR 1e-3 where the reference uses 2e-3.
+
+## Headline
+
+**Best: 13.77 min on 128 nodes (512 GH200), Track 1.** The first Track 1 run on Hangang took
+19.14 min (64 nodes); LR, layout, bucket size and network settings found in Track 2 explain the gain.
+
+![Track 1 vs Track 2](img/ttt_tracks.png)
+
+| Nodes | GPUs | Track 1 TTT | Configuration | Track 2 TTT | Configuration |
+|---:|---:|---:|---|---:|---|
+| 1 | 4 | 683.7 | GBS 32, TP2 | | |
+| 2 | 8 | 269.9 | GBS 32 | | |
+| 4 | 16 | 140.6 | GBS 32 | | |
+| 8 | 32 | 74.7 | GBS 32 | | |
+| 16 | 64 | 43.4 | GBS 32, CP2 | | |
+| 32 | 128 | 24.3 | GBS 64, CP2 | | |
+| 64 | 256 | **17.07** | GBS 64, TP2·CP2, LR 1e-3 | 17.20 | GBS 64, TP1·CP4, LR 1e-3 |
+| 128 | 512 | **13.77** | GBS 128, TP1·CP4, bucket 2e9, LR 1e-3 | 14.11 | same |
+| 256 | 1,024 | **15.27** | GBS 128, TP4·CP2, bucket 2e9, LR 1e-3 | 17.15 | GBS 256, TP4·CP1, bucket 2e9, LR 1e-3 |
+| 512 | 2,048 | 21.14 | GBS 128, TP4·CP4, bucket 2e9, LR 1e-3 | **19.11** | GBS 512, TP4·CP1, bucket 2e9, LR 1e-3 |
+| 1,024 | 4,096 | — | | (pending) | GBS 1,024, TP4·CP2, bucket 2e9 |
+
+From 64 to 256 nodes Track 1 matched or beat Track 2: the evaluation schedule is worth less
+than one minute, and GBS 128 stayed the most sample-efficient batch that still scales. Track 2
+only wins at 512 nodes, where GBS 128 forces CP across four nodes while GBS 512 does not.
+128 nodes is the sweet spot either way.
 
 ![TTT and throughput per node count](img/ttt_and_throughput.png)
 
-Up to 32 nodes the highest-throughput configuration is also the fastest to train. From 64
-nodes on they split: larger global batches process more samples per second but need more
-samples to reach the target (see *Throughput vs convergence* below).
+## What made it faster
 
-| Nodes | GPUs | GBS | Parallelism | TTT [min] | Samples to target | Train samples/s |
-|---:|---:|---:|---|---:|---:|---:|
-| 1 | 4 | 32 | TP2 | 683.7 | 208,896 | 5.2 |
-| 2 | 8 | 32 | DP8 | 269.9 | 196,608 | 12.4 |
-| 4 | 16 | 32 | DP16 | 140.6 | 196,608 | 23.9 |
-| 8 | 32 | 32 | DP32 | 74.7 | 196,608 | 45.0 |
-| 16 | 64 | 32 | CP2 | 43.4 | 196,608 | 77.2 |
-| 32 | 128 | 64 | CP2 | 24.3 | 221,184 | 155.9 |
-| 64 | 256 | 64 | CP4 | **19.1** | 221,184 | 206.4 |
-| 128 | 512 | 64 | TP2·CP4 | 20.5 | 221,184 | 188.9 |
-| 256 | 1,024 | 128 | TP4·CP2 | 29.6 | 344,064 | 199.0 |
+| Change | Where | Effect |
+|---|---|---|
+| LR 1e-3 for GBS 128 (reference 2e-3) | 64–256 nodes | samples to target 344k–402k → median ~330k (9 runs); fewer loss spikes |
+| LR 1e-3 for GBS 256 (vs 2e-3) | 256 nodes | 578k → 516k samples |
+| Up to 128 nodes: TP/CP inside a node, CP-heavy | 64–128 nodes | 128 nodes GBS 128: TP1·CP4 405 samples/s, TP4·CP1 318 |
+| From 256 nodes: TP4 (4× less gradient to synchronise across nodes) | 256–512 nodes | 256 nodes GBS 128: TP1·CP8 238 → TP4·CP2 362; 512 nodes GBS 512: TP1·CP4 601 → TP4·CP1 911 |
+| `BUCKET_SIZE=2000000000` with TP = 1, or with any TP at DP ≥ 128 | 64–512 nodes | +8–12% at 64 nodes (TP1); +85% at 512 nodes (TP4·CP1, DP 512: 911 vs 493 samples/s) |
+| TP2·CP2 instead of TP1·CP4 for GBS 64 | 64 nodes | +10–16% |
+| `NETPROFILE=cscs`, excluded nodes | ≥ 64 nodes | no hangs or NaN in any of today's 34 jobs except one CXI error event |
 
-## Strong scaling at GBS 32
+`BUCKET_SIZE` counts parameters per gradient bucket (BF16, so 768M ≈ 1.5 GB). Each GPU holds
+8.0B/TP parameters, so 2e9 means ~4 buckets with TP1 but only 2 with TP2, which leaves too
+little to overlap with the backward pass:
 
-Throughput is near-linear to 8 nodes (94% of linear), 81% at 16 and 60% at 32 nodes, then
-flat. With GBS fixed at 32 the per-step gradient sync does not shrink, and DP is capped at 32,
-so extra GPUs only add CP/TP communication.
+| 64 nodes | 768M | 1.0B | 1.5B | 2.0B |
+|---|---:|---:|---:|---:|
+| GBS 64, TP2·CP2 | **225–239** | 199 | 205 | 212–213 |
+| GBS 64, TP1·CP4 | 206 | | | **229** |
+| GBS 128, TP1·CP2 | 283 | | | **299–307** |
 
-![GBS 32 throughput](img/throughput_gbs32.png)
+At DP 512 the picture flips: with TP4 each GPU holds 2.0B parameters, so 2e9 is a single
+bucket with no overlap at all, yet it beats three 768M buckets by 85% (512 nodes, GBS 512,
+TP4·CP1: 911 vs 493 samples/s). Each collective across 512 nodes carries a large fixed
+latency, so fewer, larger collectives win; overlap matters only while that latency is small.
 
-## A larger global batch above 32 nodes
+Options that did not help at 64 nodes (100-step probes):
 
-GBS 64 needs 12-27% more samples to converge but raises throughput by 33-66%, so it wins at
-every scale from 32 nodes. 64 nodes is the sweet spot: 128 nodes needs TP2·CP4 and is slower.
+| Option | Result |
+|---|---|
+| `NUM_DISTOPT_INSTANCES=2` | −25 to −31% |
+| `FP8_ATTN=1` | fails: `No dot product attention backend is available` with CP |
+| `OVERLAP_PG_OPTIM=True` | fails at init: `IndexError` |
+| GBS 128 TP2·CP1 (bucket 1e9) | 279, vs 300 for TP1·CP2 with bucket 2e9 |
 
-![GBS 32 vs 64](img/ttt_gbs32_vs_gbs64.png)
+## Throughput vs convergence
 
-GBS 128 converges only with the MLPerf reference hyperparameters (LR 2e-3, 256 warmup steps;
-see [`recipes/README.md`](../recipes/README.md)): 64 nodes 22.4 min, 256 nodes 29.6 min.
+More nodes need a larger GBS (DP cannot exceed GBS), and above GBS 128 the samples needed to
+reach the target grow almost as fast as the batch:
 
-## 256 nodes: throughput only
-
-300-step runs with all TP/CP traffic inside a node (TP1·CP4). Per-step gradient sync across
-256 nodes costs about 0.7 s (about 0.1 s on 64 nodes); more micro-batches per GPU hide it.
-GBS 512 and 1,024 have no MLPerf reference hyperparameters, and both runs hung after 64 and
-32 steps, so these are not time-to-train results.
-
-![256-node throughput](img/throughput_256nodes.png)
-
-## Throughput vs convergence: why more nodes stop helping
+| GBS | Samples to target (LR 1e-3 unless noted) | vs previous GBS | MLPerf reference mean |
+|---:|---|---:|---:|
+| 32 | 184k–209k (LR 4e-4) | | 179k |
+| 64 | 209k–258k | | 227k |
+| 128 | 307k–393k, median ~330k | ~1.45× | 346k (LR 2e-3) |
+| 256 | 516k–522k (LR 2e-3: 578k) | ~1.6× | none |
+| 512 | 0.93M–1.15M (4 runs) | ~1.9× | none |
 
 ![throughput by GBS](img/throughput_by_gbs.png)
 
-At a fixed GBS, throughput peaks and then falls as nodes are added: DP cannot exceed GBS, so
-extra GPUs go to TP/CP and their communication outweighs the extra compute. At a fixed node
-count, a larger GBS raises throughput (64 nodes: GBS 32/64/128/256 → 123/206/283/339 samples/s).
-But the samples needed to reach the target grow faster than throughput above GBS 64:
-
-| GBS | Samples to target (Hangang) | vs GBS 64 | MLPerf reference mean |
-|---:|---|---:|---:|
-| 32 | 184k–209k | 0.9× | 179k |
-| 64 | 221k–233k | 1.0× | 227k |
-| 128 | 344k–402k | ~1.7× | 346k |
-| 256 | 578k (LR 2e-3), 762k (LR 3e-3) | ~2.6× | none |
+At 512 nodes with TP1·CP4, GBS 512 leaves one micro-batch per GPU: ~0.2 s of compute against
+~0.7 s of gradient synchronisation across 2,048 GPUs (601 samples/s). TP4·CP1 shrinks the
+gradient each GPU synchronises to a quarter and reaches 911 samples/s (0.58 s per step).
 
 ![convergence vs samples](img/convergence_samples.png)
 
-On the same 64 nodes, GBS 128 and 256 process 37% and 64% more samples per second than GBS 64,
-yet GBS 64 reaches 3.3 first (19.1 vs 22.4 vs 29.3 min). Time axis below is approximate
-(evaluations placed at uniform throughput, last point = measured TTT); regenerate exact curves
-from your logs with `tools/export_eval_curves.py`.
+Same 64 nodes, different GBS (LR 2e-3 runs from 2026-11-02; time axis approximate):
 
 ![convergence vs time at 64 nodes](img/convergence_time_64nodes.png)
 
-## Beyond the MLPerf rules: 128 to 512 nodes
+## Run-to-run variance
 
-With any parallelism, batch size, hyperparameters and evaluation schedule allowed, and the
-same stop condition (log perplexity < 3.3 on the same 1,024 validation samples):
+Samples-to-target varies ±10–20% between runs with identical settings, and throughput varies
+5–10% with node placement. Examples: 64 nodes, GBS 64, TP2·CP2, LR 1e-3, Track 1: 19.60 min
+(258k samples) and 17.07 min (221k); 128 nodes, GBS 128: 13.77 and 14.32 min; 256 nodes, GBS 128:
+28.35 min at 393k samples where ~330k was typical. Compare configurations on repeated runs.
 
-| Nodes | Best configuration | TTT | Note |
-|---:|---|---:|---|
-| 128 | GBS 64, TP2·CP4, first eval at 196,608 then every 3,072 samples | 20.3 min | MLPerf schedule: 20.5 min |
-| 256 | GBS 128, TP4·CP2 | 29.6 min | A TP2·CP4 run with a dense late schedule took 32.6 min: 402k samples vs 344k |
-| 512 | (not run) GBS 256, TP2·CP4 at 223 samples/s × ~578k samples | ~43 min projected | GBS 128: 111 samples/s → ~52 min |
+## Strong scaling at GBS 32 (2026-11-01/02)
 
-100-step throughput probes (training samples/s):
+Near-linear to 8 nodes (94%), 81% at 16 and 60% at 32 nodes, then flat: with GBS fixed, DP is
+capped at 32 and extra GPUs only add CP/TP communication.
 
-| Nodes | GBS 64 | GBS 128 | GBS 256 |
-|---:|---|---|---|
-| 128 | TP2·CP4 189, TP4·CP2 139, TP1·CP8 114 | TP1·CP4 235 | — |
-| 256 | TP2·CP8 103, TP4·CP4 95 | TP2·CP4 202, TP4·CP2 199 | TP1·CP4 271 |
-| 512 | TP4·CP8 54 | TP4·CP4 111, TP2·CP8 109 | TP2·CP4 223 |
+![GBS 32 throughput](img/throughput_gbs32.png)
 
-Above 64 nodes the run-to-run spread in samples-to-target (±10–15%) matters more than layout
-tuning. Moving the evaluation schedule saved 0.25 min at 128 nodes. The optional schedule is
-`EVAL_START=<samples> EVAL_EVERY=<samples>` in `submit.sh`; it is not MLPerf-compliant.
+![GBS 32 vs 64](img/ttt_gbs32_vs_gbs64.png)
 
 ## Comparison with MLPerf v6.0 Hopper submissions
 
-| GPUs | Hangang GH200 | Published Hopper result |
+| GPUs | Hangang GH200 (Track 1) | Published Hopper result |
 |---:|---|---|
-| 16 | 140.6 min (4 nodes) | 122.2 min, Cisco 2x8 H200 SXM |
+| 16 | 140.6 min (4 nodes, GBS 32) | 122.2 min, Cisco 2x8 H200 SXM |
 | 64 | 43.4 min (16 nodes, GBS 32) | 33.1 min, Cisco 8x8 H100 (GBS 32) |
 | 128 | 24.3 min (32 nodes, GBS 64) | 22.0 min, Cisco 16x8 H100 (GBS 64) |
+| 512 | 13.77 min (128 nodes, GBS 128) | none |
 
-Cisco evaluated every 8,192 samples; the v6.0 and v6.1 rules (and our runs) use 12,288, which
-can add up to one evaluation interval of extra training. Cisco also packs 8 GPUs per node
-behind NVSwitch, so 64 GPUs span 8 nodes instead of 16.
+Cisco evaluated every 8,192 samples (the v6.0/v6.1 rules say 12,288) and packs 8 GPUs per node
+behind NVSwitch. The 16–128 GPU Hangang rows predate the LR 1e-3 and bucket findings.
 
 ## Other measurements
 
 | Measurement | Result |
 |---|---|
-| TP vs CP inside a node (64 nodes, GBS 64) | CP4 19.14 min, TP4 19.64 min |
-| GBS 64 hyperparameters (32 nodes) | LR 8e-4 + 96 warmup steps: 221k samples; LR 1.2e-3: 233k |
-| CXI profile `base` vs `cscs` (4 nodes) | 140.6 vs 140.8 min, no throughput cost |
-| `base` vs `cscs` (2 nodes) | 269.9 vs 275.3 min (node placement noise) |
+| TP vs CP inside a node (64 nodes, GBS 64, 768M buckets) | TP1·CP4 206, TP2·CP2 225–239, TP4·CP1 193 samples/s |
+| CXI profile `base` vs `cscs` (4 nodes) | 140.6 vs 140.8 min |
 | 2-node NCCL all-reduce, 2 GB | 298 GB/s bus bandwidth with CXI, 11.4 GB/s over TCP |
+| 256 nodes, TP1·CP4, 768M buckets, 300 steps | GBS 256/512/1,024: 271/437/705 samples/s |

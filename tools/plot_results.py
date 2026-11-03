@@ -41,7 +41,7 @@ for bar, r in zip(bars, b.values()):
                 ha="center", va="bottom", fontsize=7)
 ax.set_yscale("log"); ax.set_ylim(10, 1500); ax.grid(alpha=.3, which="both", axis="y")
 ax.set_xlabel("nodes (4x GH200 each)"); ax.set_ylabel("time to train [min], log scale")
-save(fig, ax, "ttt_best_per_scale.png", "Best time-to-train per node count (target log ppl 3.3)")
+save(fig, ax, "ttt_best_per_scale.png", "Track 1 (MLPerf evaluation schedule): best time-to-train")
 
 # 2. GBS 32 training throughput vs linear scaling from 4 nodes
 g32 = best([r for r in ok if r["gbs"] == "32"])
@@ -82,7 +82,7 @@ v1 = [f(bt[n], "ttt_min") for n in ns]
 a1.barh(y, v1, color=BLUE, height=.6)
 for yi, v in zip(y, v1): a1.text(v * 1.05, yi, f"{v:.1f}", va="center", fontsize=8)
 a1.set_xscale("log"); a1.set_xlim(10, 2000); a1.set_yticks(list(y)); a1.set_yticklabels(labels); a1.invert_yaxis()
-a1.set_xlabel("time to train [min], log scale"); a1.set_title("Best time-to-train"); a1.grid(alpha=.3, axis="x", which="both")
+a1.set_xlabel("time to train [min], log scale"); a1.set_title("Best time-to-train (Track 1)"); a1.grid(alpha=.3, axis="x", which="both")
 h = .38
 vt = [f(bt[n], "train_samples_per_s") for n in ns]; vm = [f(bmax[n], "train_samples_per_s") for n in ns]
 a2.barh([yi - h / 2 for yi in y], vt, height=h, color=BLUE, label="fastest-to-train config")
@@ -122,4 +122,24 @@ for name, xkey, xlabel, title, only64 in [
     ax.axhline(3.3, ls="--", color="gray", lw=1); ax.text(ax.get_xlim()[1], 3.3, " target 3.3", va="center", fontsize=8)
     ax.set_ylim(3.2, 7.0); ax.set_xlabel(xlabel); ax.set_ylabel("validation log perplexity"); ax.grid(alpha=.3); ax.legend(fontsize=8)
     save(fig, ax, name, title)
+# 8. Track 1 vs Track 2 best TTT at 64-512 nodes
+relaxed = [r for r in rows if r["status"] == "success" and r["eval_schedule"] == "relaxed"]
+t1 = best([r for r in ok if int(r["nodes"]) >= 64]); t2 = best([r for r in relaxed if int(r["nodes"]) >= 64])
+ns = sorted(set(t1) | set(t2)); w = .38
+fig, ax = plt.subplots(figsize=(8, 4.4))
+for i, (lab, t, c) in enumerate([("Track 1: MLPerf evaluation schedule, GBS <= 128", t1, BLUE),
+                                 ("Track 2: relaxed runs (any GBS, free eval schedule)", t2, ORANGE)]):
+    for j, n in enumerate(ns):
+        x = j + (i - .5) * w
+        if n in t:
+            v = f(t[n], "ttt_min"); ax.bar(x, v, w, color=c, label=lab if j == 0 or n == min(t) else None)
+            ax.annotate(f'{v:.1f}\nGBS{t[n]["gbs"]}', (x, v), ha="center", va="bottom", fontsize=7)
+        else:
+            ax.annotate("n/a", (x, 1), ha="center", va="bottom", fontsize=8, color="gray")
+ax.set_xticks(range(len(ns))); ax.set_xticklabels([f"{n} nodes" for n in ns])
+h, l = ax.get_legend_handles_labels(); seen = {}
+for hh, ll in zip(h, l): seen.setdefault(ll, hh)
+ax.legend(seen.values(), seen.keys(), fontsize=8, loc="upper left")
+ax.set_ylabel("time to train [min]"); ax.set_ylim(0, max(f(r, "ttt_min") for r in t2.values()) * 1.25); ax.grid(alpha=.3, axis="y")
+save(fig, ax, "ttt_tracks.png", "Best time-to-train: Track 1 vs Track 2")
 print("wrote", sorted(os.listdir(out)))
