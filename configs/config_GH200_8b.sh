@@ -35,7 +35,17 @@ export WARMUP_STEPS=${OV_WARMUP_STEPS:-20}
 # Eval every 12288 sequences (training_rules v6.1). Cisco v6.0 used 8192 (VAL_CHECK_INTERVAL=8192/GBS).
 export VAL_CHECK_INTERVAL=${OV_VAL_CHECK_INTERVAL:-$(( (12288 + GBS - 1) / GBS ))}
 # Smoke tests only (changes nothing else; LR decay stays at 1.2M steps)
-[ -n "${OV_MAX_STEPS:-}" ] && export MAX_STEPS=$OV_MAX_STEPS
+# MAX_STEPS sizes the dataset index rank 0 builds before training. With the MLPerf value
+# (1.2M steps) a GBS of 256 needs >10 min and the other ranks hit the NCCL timeout, so for
+# GBS >= 128 cap it at 2M samples (5x what GBS 128 needs). LR decay still uses 1.2M steps.
+if [ -n "${OV_MAX_STEPS:-}" ]; then export MAX_STEPS=$OV_MAX_STEPS
+elif [ "$GBS" -ge 128 ]; then export MAX_STEPS=$(( 2000000 / GBS )); fi
+# Non-MLPerf evaluation schedule: first eval near EVAL_START samples, then every EVAL_EVERY
+# samples (needs patches/callback_logging.py, created by scripts/00_fetch_sources.sh)
+if [ -n "${OV_EVAL_EVERY:-}" ]; then
+  K=$(( (OV_EVAL_EVERY + GBS - 1) / GBS )); S0=$(( (${OV_EVAL_START:-12288} + GBS - 1) / GBS )); S0=$(( (S0 + K - 1) / K * K ))
+  export VAL_CHECK_INTERVAL=$S0 EVAL_INTERVAL_AFTER=$K
+fi
 
 # NVIDIA default "bindpcie --cpu=node" is untested on Grace; off unless requested
 export BINDCMD=${OV_BINDCMD:-}

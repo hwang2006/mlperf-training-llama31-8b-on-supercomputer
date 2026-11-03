@@ -1,0 +1,72 @@
+run,nodes,gbs,samples,log_ppl,minutes_since_run_start,minutes_source
+cisco-h200-r0,16,32,8192,6.536,5.23,measured
+cisco-h200-r0,16,32,16384,5.6892,10.46,measured
+cisco-h200-r0,16,32,24576,4.8917,15.69,measured
+cisco-h200-r0,16,32,32768,4.348,20.92,measured
+cisco-h200-r0,16,32,40960,4.0989,26.15,measured
+cisco-h200-r0,16,32,49152,3.9605,31.39,measured
+cisco-h200-r0,16,32,57344,3.8462,36.61,measured
+cisco-h200-r0,16,32,65536,3.7515,41.85,measured
+cisco-h200-r0,16,32,73728,3.6991,47.08,measured
+cisco-h200-r0,16,32,81920,3.6276,52.3,measured
+cisco-h200-r0,16,32,90112,3.5892,57.53,measured
+cisco-h200-r0,16,32,98304,3.5514,62.76,measured
+cisco-h200-r0,16,32,106496,3.5088,67.99,measured
+cisco-h200-r0,16,32,114688,3.4857,73.21,measured
+cisco-h200-r0,16,32,122880,3.4551,78.44,measured
+cisco-h200-r0,16,32,131072,3.4235,83.67,measured
+cisco-h200-r0,16,32,139264,3.4026,88.89,measured
+cisco-h200-r0,16,32,147456,3.3911,94.12,measured
+cisco-h200-r0,16,32,155648,3.3742,99.34,measured
+cisco-h200-r0,16,32,163840,3.3383,104.57,measured
+cisco-h200-r0,16,32,172032,3.3222,109.8,measured
+cisco-h200-r0,16,32,180224,3.3176,115.02,measured
+cisco-h200-r0,16,32,188416,3.2956,120.25,measured
+1198603,64,64,12288,6.5307,1.06,approx (uniform rate)
+1198603,64,64,24576,5.6431,2.13,approx (uniform rate)
+1198603,64,64,36864,4.8033,3.19,approx (uniform rate)
+1198603,64,64,49152,4.2579,4.25,approx (uniform rate)
+1198603,64,64,61440,4.0602,5.32,approx (uniform rate)
+1198603,64,64,73728,3.8675,6.38,approx (uniform rate)
+1198603,64,64,86016,3.7371,7.44,approx (uniform rate)
+1198603,64,64,98304,3.6604,8.51,approx (uniform rate)
+1198603,64,64,110592,3.5913,9.57,approx (uniform rate)
+1198603,64,64,122880,3.7794,10.63,approx (uniform rate)
+1198603,64,64,135168,3.5136,11.7,approx (uniform rate)
+1198603,64,64,147456,3.4901,12.76,approx (uniform rate)
+1198603,64,64,159744,3.426,13.82,approx (uniform rate)
+1198603,64,64,172032,3.3999,14.89,approx (uniform rate)
+1198603,64,64,184320,3.3533,15.95,approx (uniform rate)
+1198603,64,64,196608,3.3438,17.01,approx (uniform rate)
+1198603,64,64,208896,3.3168,18.08,approx (uniform rate)
+1198603,64,64,221184,3.2858,19.14,approx (uniform rate)
+1199958,64,128,12288,6.899,0.75,approx (uniform rate)
+1199958,64,128,24576,6.4566,1.49,approx (uniform rate)
+1199958,64,128,36864,6.0209,2.24,approx (uniform rate)
+1199958,64,128,49152,5.3697,2.99,approx (uniform rate)
+1199958,64,128,61440,4.9552,3.73,approx (uniform rate)
+1199958,64,128,73728,4.6996,4.48,approx (uniform rate)
+1199958,64,128,86016,4.9902,5.22,approx (uniform rate)
+1199958,64,128,98304,4.5026,5.97,approx (uniform rate)
+1199958,64,128,110592,4.1963,6.72,approx (uniform rate)
+1199958,64,128,122880,4.0321,7.46,approx (uniform rate)
+1199958,64,128,135168,4.427,8.21,approx (uniform rate)
+1199958,64,128,147456,4.2895,8.96,approx (uniform rate)
+1199958,64,128,159744,3.9303,9.7,approx (uniform rate)
+1199958,64,128,172032,3.8062,10.45,approx (uniform rate)
+1199958,64,128,184320,3.7146,11.2,approx (uniform rate)
+1199958,64,128,196608,3.6607,11.94,approx (uniform rate)
+1199958,64,128,208896,3.6228,12.69,approx (uniform rate)
+1199958,64,128,221184,3.5518,13.43,approx (uniform rate)
+1199958,64,128,233472,4.2703,14.18,approx (uniform rate)
+1199958,64,128,245760,3.6629,14.93,approx (uniform rate)
+1199958,64,128,258048,3.5382,15.67,approx (uniform rate)
+1199958,64,128,270336,3.5125,16.42,approx (uniform rate)
+1199958,64,128,331776,3.3564,20.15,approx (uniform rate)
+1199958,64,128,344064,3.3284,20.9,approx (uniform rate)
+1199958,64,128,356352,3.3079,21.64,approx (uniform rate)
+1199958,64,128,368640,3.2867,22.39,approx (uniform rate)
+1203405,64,256,540672,3.3887,27.45,approx (uniform rate)
+1203405,64,256,552960,3.3341,28.07,approx (uniform rate)
+1203405,64,256,565248,3.3061,28.7,approx (uniform rate)
+1203405,64,256,577536,3.2916,29.32,approx (uniform rate)

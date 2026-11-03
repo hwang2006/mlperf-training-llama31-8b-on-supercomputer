@@ -41,6 +41,10 @@ python3 tools/ttq_status.py --summary results/runs/kv6-l8b-*.out
 
 스케일별 명령과 GBS별 하이퍼파라미터는 [recipes/README.md](../recipes/README.md)에 있습니다.
 
+## 결과 요약
+
+64노드(GH200 256개), GBS 64에서 **19.1분**이 최고 기록입니다. 노드를 늘리려면 GBS를 키워야 하는데, GBS 64를 넘으면 목표까지 필요한 sample이 처리량보다 빨리 늘어나 128노드 이상에서는 더 빨라지지 않았습니다. 그래프와 수치는 [RESULTS](RESULTS.md)에 있습니다.
+
 ## 꼭 알아 둘 점
 
 | 항목 | 내용 |
@@ -50,4 +54,6 @@ python3 tools/ttq_status.py --summary results/runs/kv6-l8b-*.out
 | 네트워크 설정 | 기본값 `NETPROFILE=cscs-nordzv`. 기본 Slingshot 설정에서는 학습 중 통신이 멈추는 문제가 있었음 |
 | 제외 노드 | `env.sh`의 `EXCLUDE_NODES`. 노드 간 CP 구성에서 NaN을 일으킨 노드 등 25개 (2026-11-02 기준) |
 | 1노드 | GPU 메모리(96 GB) 때문에 `TP=2` 필요 |
+| 큰 GBS | GBS 128 이상이면 `MAX_STEPS`가 자동으로 줄어듦 (GBS 256에서 초기화 시간 초과 방지) |
+| 평가 일정 (비공식) | `EVAL_START=<sample> EVAL_EVERY=<sample>`로 첫 평가를 늦추고 간격을 좁힐 수 있음. MLPerf 규정과는 다름 |
 | 결과의 성격 | 모두 1회 실행이며 MLCommons 공식 심사를 거치지 않은 결과. 공식 점수는 10회 실행 평균 |

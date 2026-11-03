@@ -7,7 +7,7 @@ v6.0 implementation, from 1 node (4 GPUs) to 256 nodes (1,024 GPUs).
 **Best time-to-train: 19.1 min on 64 nodes (256 GH200).** Every scale from 1 to 256 nodes
 reached the MLPerf quality target (validation log perplexity < 3.3).
 
-![best TTT per node count](docs/img/ttt_best_per_scale.png)
+![TTT and throughput per node count](docs/img/ttt_and_throughput.png)
 
 > Unofficial results: single runs, not reviewed by MLCommons. See [docs/RESULTS.md](docs/RESULTS.md).
 
@@ -16,6 +16,10 @@ Companion repositories:
 (Llama 2 70B LoRA on Hangang) and
 [kisti-neuron-mlperf-training](https://github.com/hwang2006/kisti-neuron-mlperf-training)
 (reference implementation on NEURON).
+
+More nodes need a larger global batch to raise throughput, and above GBS 64 the extra
+samples needed to converge outgrow the speedup, so 64 nodes is the sweet spot
+([docs/RESULTS.md](docs/RESULTS.md)).
 
 ## The benchmark in one paragraph
 
@@ -125,7 +129,8 @@ submit.sh NODES KEY=VALUE…  →  sbatch slurm/run_ttq.sbatch  (+ tools/watch_j
 |---|---|
 | `GBS`, `TP`, `CP`, `MBS` | Global batch and parallelism; `GBS = MINIBS × 4·nodes / (TP·CP)` |
 | `LR`, `WARMUP_STEPS` | Base LR and warmup steps (defaults 4e-4 and 20, the Cisco GBS 32 values) |
-| `MAX_STEPS`, `VAL_CHECK_INTERVAL` | Short tests; evaluation defaults to every 12,288 samples |
+| `MAX_STEPS`, `VAL_CHECK_INTERVAL` | Short tests; evaluation defaults to every 12,288 samples. `MAX_STEPS` is capped automatically for GBS ≥ 128 |
+| `EVAL_START`, `EVAL_EVERY` | Non-MLPerf evaluation schedule in samples (first evaluation, then interval) |
 | `NETPROFILE` | CXI environment: `cscs-nordzv` (default), `cscs`, `cscs-rdzv`, `base` |
 | `TIME`, `SEED`, `NCCL_DEBUG`, `WATCH=0`, `STALL=<min>` | Slurm time limit, seed, NCCL logging, watchdog control |
 
@@ -139,6 +144,7 @@ Summary of [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md); the scripts alrea
 4. Collectives can hang silently; the CSCS Slingshot settings fix this up to 64 nodes.
 5. Some nodes produced NaN loss in runs with context parallelism across nodes; they are excluded in `env.sh`.
 6. One node needs TP=2 (96 GB GPUs); builds on login nodes need `OPENBLAS_NUM_THREADS=1`.
+7. GBS ≥ 256 timed out during initialisation (dataset index for `MAX_STEPS × GBS` samples); `MAX_STEPS` is now capped.
 
 ## Repository layout
 
@@ -154,6 +160,7 @@ container/                     build steps run inside enroot
 recipes/                       validated commands and hyperparameters
 tools/                         log parser, status, watchdog, plots, Cisco baseline
 results/summary.csv            all measured runs
+results/eval_curves.csv        evaluation curves used in docs/RESULTS.md
 docs/                          results, troubleshooting, Korean quick guide
 ```
 

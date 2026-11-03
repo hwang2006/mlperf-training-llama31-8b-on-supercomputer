@@ -18,3 +18,19 @@ fi
 echo "== NVIDIA v6.0 llama31_8b implementation"; ls "$NV_IMPL"
 echo "== Cisco H200 results";                    ls "$CISCO_RESULTS"
 echo "training_results_v6.0 commit: $(cat "$THIRD_PARTY/v60.commit")"
+
+# Patched callback for the optional non-MLPerf evaluation schedule (EVAL_START/EVAL_EVERY).
+# Without EVAL_INTERVAL_AFTER in the environment it behaves exactly like the original.
+mkdir -p "$REPO_DIR/patches"
+python3 - "$NV_IMPL/callback_logging.py" "$REPO_DIR/patches/callback_logging.py" <<'PY'
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+s = open(src).read()
+old = '        if not os.environ.get("VAL_CHECK_INTERVAL"):\n'
+new = ('        if os.environ.get("EVAL_INTERVAL_AFTER"):\n'
+       '            # first eval at VAL_CHECK_INTERVAL, then every EVAL_INTERVAL_AFTER steps\n'
+       '            context.state.cfg.validation.eval_interval = int(os.environ["EVAL_INTERVAL_AFTER"])\n'
+       '        elif not os.environ.get("VAL_CHECK_INTERVAL"):\n')
+assert s.count(old) == 1, "callback_logging.py changed upstream; patch not applied"
+open(dst, "w").write(s.replace(old, new)); print("wrote", dst)
+PY

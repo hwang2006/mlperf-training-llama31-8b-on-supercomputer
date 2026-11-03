@@ -6,6 +6,7 @@
 #
 # Keys that override configs/config_GH200_8b.sh:
 #   GBS TP CP MBS LR WARMUP_STEPS VAL_CHECK_INTERVAL MAX_STEPS FP8_ATTN=1 BINDCMD=...
+#   EVAL_START=<samples> EVAL_EVERY=<samples>   non-MLPerf eval schedule (docs/RESULTS.md)
 # Run-time keys:
 #   NETPROFILE=cscs-nordzv|cscs|cscs-rdzv|base   (default cscs-nordzv, see docs/TROUBLESHOOTING.md)
 #   NETMODE=C|A        C = Slingshot CXI (default), A = TCP sockets
@@ -27,7 +28,7 @@ EXPORTS="ALL"; NETPROFILE=cscs-nordzv; WATCH=1; STALL=5
 for kv in "$@"; do
   k=${kv%%=*}; v=${kv#*=}
   case "$k" in
-    GBS|TP|CP|MBS|LR|WARMUP_STEPS|VAL_CHECK_INTERVAL|MAX_STEPS|FP8_ATTN|BINDCMD) EXPORTS="$EXPORTS,OV_$k=$v" ;;
+    GBS|TP|CP|MBS|LR|WARMUP_STEPS|VAL_CHECK_INTERVAL|MAX_STEPS|EVAL_START|EVAL_EVERY|FP8_ATTN|BINDCMD) EXPORTS="$EXPORTS,OV_$k=$v" ;;
     NETMODE|SEED|NCCL_DEBUG) EXPORTS="$EXPORTS,$k=$v" ;;
     NETPROFILE) NETPROFILE=$v ;;
     TIME) TIME=$v ;;

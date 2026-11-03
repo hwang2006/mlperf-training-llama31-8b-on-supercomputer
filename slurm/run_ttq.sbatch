@@ -34,9 +34,10 @@ export PYTHONPATH=/workspace/Megatron-Bridge/src:/workspace/Megatron-Bridge/3rdp
 export TRITON_CACHE_DIR=/tmp/triton_cache TORCHINDUCTOR_CACHE_DIR=/tmp/inductor_cache
 export HF_HOME=/results/.cache/huggingface XDG_CACHE_HOME=/results/.cache HOME=/results
 export NCCL_DEBUG=${NCCL_DEBUG:-WARN}
-env | grep -E '^(DGX|MINIBS|TENSOR_MODEL|CONTEXT_PARALLEL|MICRO_BATCH|LR|WARMUP_STEPS|VAL_CHECK|MAX_STEPS|SEED|FP8|FP8_DPA|MCORE_CUDA_GRAPH|FULL_CUDA_GRAPH|BINDCMD)=' | sort
+env | grep -E '^(DGX|MINIBS|TENSOR_MODEL|CONTEXT_PARALLEL|MICRO_BATCH|LR|WARMUP_STEPS|VAL_CHECK_INTERVAL|EVAL_INTERVAL_AFTER|MAX_STEPS|SEED|FP8|FP8_DPA|MCORE_CUDA_GRAPH|FULL_CUDA_GRAPH|BINDCMD)=' | sort
 
 MNT=$LOGDIR:/results,$NPYDIR:/npy_index,$PREPROC_DATA:/preproc_data:ro,$TOKENIZER:/workspace/llm/nemo_tokenizer:ro
+[ -f "$REPO_DIR/patches/callback_logging.py" ] && MNT=$MNT,$REPO_DIR/patches/callback_logging.py:/workspace/llm/callback_logging.py:ro
 
 if [ "$NETMODE" = "C" ]; then
   if [ ! -f "$HOSTLIBS/.done" ]; then

@@ -13,6 +13,7 @@ scripts; this page explains what to look for if you adapt them.
 | 6 | `task N launch failed: Error configuring interconnect` | Node-side Slingshot setup failure | Exclude the node; job fails fast |
 | 7 | CUDA OOM on 1 node | 96 GB GPU; optimizer state over 4 DP ranks only | `TP=2` on 1 node |
 | 8 | Container build dies with `KeyboardInterrupt` | Login-node thread limit hit by OpenBLAS | `OPENBLAS_NUM_THREADS=1` in the build |
+| 9 | GBS ≥ 256 dies before `run_start` with NCCL `checkTimeout` | Rank 0 builds a dataset index for `MAX_STEPS × GBS` samples | `MAX_STEPS` capped automatically for GBS ≥ 128 |
 
 ## 1. aws-ofi-nccl in NGC 26.04 does not work on Slingshot
 
@@ -112,6 +113,16 @@ Hangang login nodes limit processes per user (RLIMIT_NPROC 16384). The build ver
 imports SciPy; OpenBLAS then tries to start one thread per core and the step dies with
 `KeyboardInterrupt` after `pthread_create failed`. `container/build_inside.sh` sets
 `OPENBLAS_NUM_THREADS=1`. Run long builds with `setsid nohup ... &` so they keep running after logout.
+
+## 9. Large GBS times out during initialisation
+
+`init_start` but no `run_start`, then 255 of 256 ranks print `terminate called after throwing
+an instance of 'c10::DistBackendError'` from `ProcessGroupNCCL.cpp ... checkTimeout`. Before
+training, rank 0 builds the shuffled sample index for `MAX_STEPS × GBS` samples while the other
+ranks wait in a collective. With MLPerf's 1.2M steps that is 38M samples at GBS 32 (init ~1.5
+min), 154M at GBS 128 (~5 min) and 307M at GBS 256 (>10 min, the NCCL timeout).
+`configs/config_GH200_8b.sh` now sets `MAX_STEPS = 2,000,000 / GBS` for GBS ≥ 128; the LR decay
+length stays at 1.2M steps, so training is unchanged. Override with `MAX_STEPS=<steps>`.
 
 ## Other Hangang notes
 

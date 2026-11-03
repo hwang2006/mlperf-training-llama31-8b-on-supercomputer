@@ -9,3 +9,5 @@ results/nodes_*.txt
 results/*suspects*.txt
 *.sqsh
 __pycache__/
+patches/
+._dbindex_/
