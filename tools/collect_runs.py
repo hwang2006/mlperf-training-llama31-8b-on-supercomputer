@@ -53,9 +53,11 @@ def scan(path):
             m = re.search(r"RUN_EXIT=(\d+)", line)
             if m:
                 run_exit = m.group(1)
-            for k, rx in CFG_RE.items():
-                for v in rx.findall(line):
-                    cfg[k] = v
+            if "=" in line and len(line) < 2000:      # config lines are short and contain "="
+                for k, rx in CFG_RE.items():
+                    if k in line:
+                        for v in rx.findall(line):
+                            cfg[k] = v
             if KEEP_RE.search(line):
                 keep.append(line)
     return cfg, tag, run_exit, hello, neterr, nan, tb, keep
@@ -111,8 +113,9 @@ def main():
             sched = "none"
         else:
             sched = "mlperf"
-        status = r["status"] or ("nan" if nan else watch_verdict(job, os.path.dirname(p)) or
-                                 ("no-run-start" if not rs else "incomplete"))
+        # NaN never recovers, so it outranks the MLPerf stop status (short runs log "aborted")
+        status = "nan" if nan else (r["status"] or watch_verdict(job, os.path.dirname(p)) or
+                                    ("no-run-start" if not rs else "incomplete"))
         if tb and not rs and status == "no-run-start":
             status = "init-error"
         last = r["evals"][-1] if r["evals"] else (None, None, None)
