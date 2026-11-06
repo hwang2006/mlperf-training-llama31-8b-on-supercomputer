@@ -125,6 +125,23 @@ capped at 32 and extra GPUs only add CP/TP communication.
 
 ![GBS 32 vs 64](img/ttt_gbs32_vs_gbs64.png)
 
+## Reproducibility on Hangang (2026-11-06)
+
+The repository was rerun from a fresh `git clone` following only the README: by a second
+account (q667a01, which may only use the `5thEx` partition) and by the original account in a
+new directory with separate data and container paths (`env.local.sh`).
+
+| Environment | NCCL C2, 2 GB | 4-node smoke test | 4-node time-to-train |
+|---|---:|---|---:|
+| t519a01, original (`normal`) | 298 GB/s | first loss 12.58, 23.9 samples/s | 140.6 min, 196,608 samples |
+| q667a01, fresh account (`5thEx`) | 297 GB/s | first loss 12.57, 24.1 samples/s | **131.8 min**, 184,320 samples |
+| t519a01, fresh clone (`normal`) | 298 GB/s | first loss 12.59, 24.3 samples/s | (not run) |
+
+Training throughput matched to 0.1% (23.87 vs 23.88 samples/s); the 6% shorter time-to-train is
+one evaluation interval fewer to reach the target. The tests found 16 problems in scripts and
+docs (partition policy, a plugin build conflict, a truncated NCCL check, tool bugs); all are
+fixed and listed in `docs/TROUBLESHOOTING.md`.
+
 ## Comparison with MLPerf v6.0 Hopper submissions
 
 | GPUs | Hangang GH200 (Track 1) | Published Hopper result |

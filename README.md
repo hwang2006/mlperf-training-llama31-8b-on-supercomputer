@@ -5,6 +5,7 @@ Reproducible recipe for the **MLPerf Training Llama 3.1 8B pretraining** benchma
 v6.0 implementation, from 1 node (4 GPUs) to 1,024 nodes (4,096 GPUs).
 
 **Best time-to-train: 13.8 min on 128 nodes (512 GH200)** with the MLPerf evaluation schedule.
+Reproduced from a fresh clone by a second Hangang account (4 nodes: 131.8 vs 140.6 min).
 Every scale from 1 to 1,024 nodes reached the MLPerf quality target (validation log perplexity < 3.3).
 
 ![Track 1 vs Track 2](docs/img/ttt_tracks.png)
@@ -47,10 +48,10 @@ Measured on Hangang with a fresh account (2026-11-06):
 
 | Step | Time |
 |---|---|
-| Data download (84 GB from MLCommons) | several hours (0.7-8 MB/s from the login node); copying from another user's `/scratch`: 2 min |
-| Base image import (NGC, batch job) | 15-60 min |
+| Data download (84 GB from MLCommons) | ~2 h at the better times (0.8 GB/min), much longer at others; copying from another `/scratch`: 2 min |
+| Base image import (NGC, batch job) | 2-60 min, depending on the NGC download rate |
 | aws-ofi-nccl build | 5 min |
-| Benchmark container build | 11-70 min |
+| Benchmark container build | 11-15 min (earlier builds: up to 70 min) |
 | 2-node NCCL check | 5 min |
 | 4-node smoke test | 6-10 min |
 
@@ -126,6 +127,8 @@ progress. If the job times out, submit it again: downloaded layers are reused.
 setsid nohup ./scripts/02_build_container.sh > results/build.log 2>&1 < /dev/null &
 ```
 
+Run both lines: the first prints `OFI_BUILD_OK` and returns; the second starts the container
+build in the background (`./scripts/check_setup.sh` shows `4 container: build running`).
 The build log ends with `BUILD_EXIT=0` and `$CONT_DIR` then holds
 `kv6-nv60-llama31-8b-arm64.sqsh` (~10 GB). Both scripts stop at once with
 `Base image not found` if 2a is not done yet.
@@ -133,7 +136,7 @@ The build log ends with `BUILD_EXIT=0` and `$CONT_DIR` then holds
 ### 3. Network check (2 nodes, ~5 min)
 
 ```bash
-sbatch -N 2 -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" slurm/nccl_test.sbatch
+sbatch -N 2 -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" --exclude="$EXCLUDE_NODES" slurm/nccl_test.sbatch
 grep -E "^##########|world=|allreduce +(512|2048) MB" $(ls -t results/kv6-nccl-*.log | head -1)
 ```
 

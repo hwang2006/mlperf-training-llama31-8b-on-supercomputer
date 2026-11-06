@@ -23,7 +23,7 @@ for p in paths:
     rate = None          # average incl. eval, from cumulative samples since run_start
     pts = [(t, s) for t, s, *_ in r["train"] if s] + [(t, s) for s, _, t in r["evals"] if s]
     if r["run_start"] and pts:
-        t, s = max(pts)
+        t, s = max(pts, key=lambda p: (p[1], p[0]))   # furthest point in samples, not the latest record
         if t > r["run_start"]:
             rate = s / ((t - r["run_start"]) / 1000.0)
     steps = sorted(st for _, s, st, _ in r["train"] if st and s)   # skip step 0 (graph capture)

@@ -103,7 +103,7 @@ def main():
         pts = [(t, s) for t, s, *_ in r["train"] if s] + [(t, s) for s, _, t in r["evals"] if s]
         avg_rate = None
         if rs and pts:
-            t, s = max(pts)
+            t, s = max(pts, key=lambda p: (p[1], p[0]))   # furthest point in samples
             avg_rate = s / ((t - rs) / 1000.0) if t > rs else None
         maxsteps = int(cfg.get("MAX_STEPS", "0") or 0)
         vci = int(cfg.get("VAL_CHECK_INTERVAL", "0") or 0)

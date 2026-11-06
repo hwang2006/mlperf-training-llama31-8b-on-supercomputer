@@ -18,10 +18,10 @@
 
 | 단계 | 시간 |
 |---|---|
-| 데이터 다운로드 (84 GB) | 로그인 노드에서 수 시간. 다른 사용자의 `/scratch`에서 복사하면 약 2분 |
-| base 이미지 가져오기 (배치 작업) | 15~60분 |
+| 데이터 다운로드 (84 GB) | 빠를 때 약 2시간(분당 약 0.8 GB), 느릴 때는 훨씬 더. 다른 `/scratch`에서 복사하면 약 2분 |
+| base 이미지 가져오기 (배치 작업) | 2~60분 (NGC 다운로드 속도에 따라) |
 | aws-ofi-nccl 빌드 | 약 5분 |
-| 벤치마크 컨테이너 빌드 | 11~70분 |
+| 벤치마크 컨테이너 빌드 | 11~15분 (예전 빌드는 70분까지) |
 | 2노드 NCCL 점검 | 약 5분 |
 | 4노드 시험 | 6~10분 |
 
@@ -78,12 +78,12 @@ sbatch -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" scripts/01_import_base_i
 setsid nohup ./scripts/02_build_container.sh > results/build.log 2>&1 < /dev/null &
 ```
 
-빌드 로그 끝에 `BUILD_EXIT=0`이 나오고 `$CONT_DIR`에 `kv6-nv60-llama31-8b-arm64.sqsh`(약 10 GB)가 생기면 끝입니다. 2a가 끝나기 전에 실행하면 `Base image not found`로 바로 멈춥니다.
+**두 줄을 모두 실행하세요.** 첫 줄은 `OFI_BUILD_OK`를 출력하고 끝나고, 둘째 줄이 컨테이너 빌드를 뒤에서 시작합니다(`./scripts/check_setup.sh`에 `4 container: build running`). 빌드 로그 끝에 `BUILD_EXIT=0`이 나오고 `$CONT_DIR`에 `kv6-nv60-llama31-8b-arm64.sqsh`(약 10 GB)가 생기면 끝입니다. 2a가 끝나기 전에 실행하면 `Base image not found`로 바로 멈춥니다.
 
 ## 3. 점검
 
 ```bash
-sbatch -N 2 -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" slurm/nccl_test.sbatch
+sbatch -N 2 -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" --exclude="$EXCLUDE_NODES" slurm/nccl_test.sbatch
 grep -E "^##########|world=|allreduce +(512|2048) MB" $(ls -t results/kv6-nccl-*.log | head -1)
 ./submit.sh 4 MAX_STEPS=200 TIME=00:40:00
 ```
@@ -111,6 +111,8 @@ python3 tools/collect_runs.py results/runs --sacct     # 모든 실행의 설정
 스케일별 명령과 GBS별 하이퍼파라미터는 [recipes/README.md](../recipes/README.md)에 있습니다.
 
 ## 결과 요약
+
+**재현 확인**: 새 계정(q667a01, `5thEx`)에서 저장소를 처음부터 따라 해 4노드 TTT 131.8분(원래 140.6분, 학습 처리량 0.1% 차이)으로 재현됐습니다.
 
 128노드(GH200 512개), GBS 128에서 **13.77분**이 최고 기록입니다(MLPerf 평가 방식). 결과는 두 트랙으로 나눕니다. **트랙 1**은 MLPerf처럼 12,288 sample마다 평가하고 GBS 128 이하만 쓰며, **트랙 2**는 종료 조건만 같고 GBS와 평가 일정이 자유입니다. 노드를 늘리려면 TP·CP를 노드 안에 두기 위해 GBS를 키워야 하는데, GBS 128을 넘으면 목표까지 필요한 sample이 거의 batch만큼 늘어나 128노드가 최적점이었습니다. 그래프와 수치는 [RESULTS](RESULTS.md)에 있습니다.
 
