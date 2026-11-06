@@ -85,6 +85,7 @@ and put it in `env.local.sh`, your personal settings file (also for `SLURM_COMME
 ```bash
 echo 'export SLURM_PARTITION=5thEx' >> env.local.sh      # your partition; env.local.sh is not tracked by git
 source env.sh && echo "$SLURM_PARTITION | $SLURM_COMMENT | $DATA_ROOT | $CONT_DIR"
+./scripts/check_setup.sh                          # first line shows partition=<yours>
 ```
 
 ### 1. Sources and data (login node)
@@ -92,6 +93,7 @@ source env.sh && echo "$SLURM_PARTITION | $SLURM_COMMENT | $DATA_ROOT | $CONT_DI
 ```bash
 ./scripts/00_fetch_sources.sh | tail -2           # NVIDIA v6.0 implementation, patched callback
 setsid nohup ./scripts/04_prepare_data.sh > results/data-download.log 2>&1 < /dev/null &
+./scripts/check_setup.sh                          # 1 data: download running (...G so far)
 ```
 
 `setsid nohup … &` detaches the job from your terminal; the shell prints `[1]+ Done` at once,
@@ -113,6 +115,7 @@ cp -a $S/tokenizer/llama3_1_8b_tokenizer_only/. "$TOKENIZER/"
 
 ```bash
 sbatch -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" scripts/01_import_base_image.sbatch
+./scripts/check_setup.sh                          # 2 base image: import job running, then [ OK ]
 ```
 
 Wait until the job has left `squeue` and its log `results/kv6-import-<job>.log` ends with
@@ -125,6 +128,7 @@ progress. If the job times out, submit it again: downloaded layers are reused.
 ```bash
 ./scripts/03_build_ofi_plugin.sh 2>&1 | tee results/ofi-build.log | tail -3     # OFI_BUILD_OK
 setsid nohup ./scripts/02_build_container.sh > results/build.log 2>&1 < /dev/null &
+./scripts/check_setup.sh                          # 4 container: build running, then [ OK ]
 ```
 
 Run both lines: the first prints `OFI_BUILD_OK` and returns; the second starts the container
@@ -157,7 +161,7 @@ python3 tools/ttq_status.py results/runs/kv6-l8b-<job>.out
 
 Expect a first loss of ~12.58 and about 24 training samples/s. `"status": "aborted"` is normal
 for a `MAX_STEPS` run. If one rank fails with `CUDA out of memory` while the others are fine,
-a GPU on that node was not empty (seen once on node1802); exclude the node for your runs:
+a GPU on that node was not empty (seen once on node1802, which passed later); resubmit, or exclude the node:
 `EXTRA_EXCLUDE=node1802 ./submit.sh 4 MAX_STEPS=200 TIME=00:40:00`.
 
 ### 5. Time-to-train runs
@@ -220,7 +224,7 @@ Summary of [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md); the scripts alrea
 7. GBS ≥ 256 timed out during initialisation (dataset index for `MAX_STEPS × GBS` samples); `MAX_STEPS` is now capped.
 8. One hang came with CXI `UNDELIVERABLE` send errors from three neighbouring nodes; they are excluded.
 9. The best layout changes with scale: CP-heavy up to 128 nodes, TP4 with large gradient buckets from 256 nodes.
-10. Each group may submit only to some GH200 partitions; one GPU on node1802 had memory already in use.
+10. Each group may submit only to some GH200 partitions; one GPU on node1802 once had memory already in use.
 
 ## Repository layout
 

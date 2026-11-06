@@ -23,3 +23,6 @@ enroot start --rw --root -e CRAY_LIBFABRIC="$CRAY_LIBFABRIC" \
   --mount "$REPO_DIR/container:/build" "$NAME" bash /build/build_ofi_inside.sh
 enroot remove -f "$NAME"
 ls -la "$OFI_DIR/lib"
+# last line is the verdict, so `| tail -3` in the README shows it
+if [ -f "$OFI_DIR/lib/libnccl-net-ofi.so" ]; then echo "OFI_BUILD_OK $OFI_DIR/lib/libnccl-net-ofi.so"
+else echo "OFI_BUILD_FAILED (see results/ofi-build.log)"; exit 1; fi

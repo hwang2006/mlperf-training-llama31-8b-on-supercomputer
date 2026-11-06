@@ -18,13 +18,16 @@ if [ ! -f "$PREPROC_DATA/c4-train.en_6_text_document.bin" ]; then
       https://training.mlcommons-storage.org/metadata/llama-3-1-8b-preprocessed-c4-dataset.uri )
 fi
 TOK_FULL=$DATA_ROOT/tokenizer/llama3_1_8b_tokenizer
-if [ ! -f "$TOK_FULL/tokenizer.json" ]; then
+# Skip the ~30 GB tokenizer download (it ships unused model weights) if the 6 files are already in place
+if [ -f "$TOKENIZER/tokenizer.json" ] && [ -f "$TOKENIZER/tokenizer_config.json" ]; then
+  echo "tokenizer already in $TOKENIZER, not downloading it again"
+elif [ ! -f "$TOK_FULL/tokenizer.json" ]; then
   ( cd "$DATA_ROOT/tokenizer" && bash "$DATA_ROOT/mlc-r2-downloader.sh" -d llama3_1_8b_tokenizer \
       https://training.mlcommons-storage.org/metadata/llama-3-1-8b-tokenizer.uri )
 fi
 # Pretraining starts from random weights: mount only the 6 tokenizer files NVIDIA expects
 mkdir -p "$TOKENIZER"
-cp -p "$TOK_FULL"/{tokenizer.json,tokenizer_config.json,special_tokens_map.json,LICENSE,README.md,USE_POLICY.md} "$TOKENIZER/"
+[ -f "$TOK_FULL/tokenizer.json" ] && cp -p "$TOK_FULL"/{tokenizer.json,tokenizer_config.json,special_tokens_map.json,LICENSE,README.md,USE_POLICY.md} "$TOKENIZER/"
 
 fi
 echo "== size check against expected-mounts-8b.csv"

@@ -17,7 +17,7 @@ scripts; this page explains what to look for if you adapt them.
 | 10 | Hang preceded by `NET/OFI Request ... completed with error ... (UNDELIVERABLE)` | CXI could not deliver messages between specific nodes | Exclude the reporting nodes; report time and nodes to the system team |
 | 11 | `sbatch: error: [Partition: normal] Job rejected: your group is not authorized` | Site policy allows each group only some GH200 partitions | Find yours with `sbatch --test-only` (README step 0), set `SLURM_PARTITION` in `env.sh` |
 | 12 | aws-ofi-nccl build: `git-remote-https: symbol lookup error ... libcurl-gnutls.so.4: undefined symbol: nghttp2_...` | `/hostlibs` (host libcurl, libnghttp2) was on `LD_LIBRARY_PATH` while the container's git ran | Fixed: the build clones before setting `LD_LIBRARY_PATH` |
-| 13 | One rank fails with `CUDA out of memory` at the first CUDA graph capture, the other ranks are fine | GPU memory on that node already in use (~11 GiB on node1802 GPU 2) | `EXTRA_EXCLUDE=<node> ./submit.sh ...`; report the node |
+| 13 | One rank fails with `CUDA out of memory` at the first CUDA graph capture, the other ranks are fine | GPU memory on that node already in use (~11 GiB on node1802 GPU 2, once; the same node passed later) | Resubmit, or `EXTRA_EXCLUDE=<node> ./submit.sh ...`; report the node if it repeats |
 
 ## 1. aws-ofi-nccl in NGC 26.04 does not work on Slingshot
 
@@ -174,7 +174,8 @@ source before setting `LD_LIBRARY_PATH`; it only matters for configure and make.
 
 A 4-node smoke test that had passed many times on other nodes failed on one rank only:
 `GPU 2 has a total capacity of 95.00 GiB of which 1.57 GiB is free. ... this process has
-82.5 GiB`, i.e. ~11 GiB held by something else on node1802. Rerun with
+82.5 GiB`, i.e. ~11 GiB held by something else on node1802. The same node ran the same test
+normally a few hours later, so this was transient (likely a leftover process). Resubmit, or rerun with
 `EXTRA_EXCLUDE=node1802` (it adds to `EXCLUDE_NODES` from `env.sh`; setting `EXCLUDE_NODES`
 on the command line does not work because `submit.sh` sources `env.sh` again). To look at the
 GPU: `srun -p <partition> -w <node> -N1 --exclusive --gres=gpu:4 -t 5 --comment="$SLURM_COMMENT" nvidia-smi`.

@@ -23,17 +23,18 @@ if [ $missing = 0 ] && [ "$(stat -c %s "$PREPROC_DATA/c4-train.en_6_text_documen
 elif pgrep -u "$(id -u)" -f "04_prepare_data.sh|mlc-r2-downloader" >/dev/null; then todo "1 data: download running ($(du -sh "$DATA_ROOT" 2>/dev/null | cut -f1) so far)"; next "wait for the data download (tail -n2 results/data-download.log shows DATA_READY)"
 else todo "1 data missing or incomplete"; next "setsid nohup ./scripts/04_prepare_data.sh > results/data-download.log 2>&1 < /dev/null &"; fi
 
-# 2. base image
+# 2. base image (a .sqsh can appear before the import job has finished writing it)
+BASE_READY=0
 if squeue -u "$USER" -h -n kv6-import | grep -q .; then todo "2 base image: import job running ($(du -sh "$ENROOT_CACHE_PATH" 2>/dev/null | cut -f1) downloaded)"; next "wait for the kv6-import job (squeue -u \$USER)"
 elif [ -f "$BASE_IMG" ]; then
   IL=$(ls -t results/kv6-import-*.log 2>/dev/null | head -1)
   if [ -n "$IL" ] && ! grep -q "CHECK_EXIT=0" "$IL"; then bad "2 base image exists but $IL has no CHECK_EXIT=0"; next "tail -n20 $IL"
-  else ok "2 base image: $BASE_IMG ($(du -h "$BASE_IMG" | cut -f1))"; fi
+  else ok "2 base image: $BASE_IMG ($(du -h "$BASE_IMG" | cut -f1))"; BASE_READY=1; fi
 else todo "2 base image missing"; next "sbatch -p \"\$SLURM_PARTITION\" --comment=\"\$SLURM_COMMENT\" scripts/01_import_base_image.sbatch"; fi
 
 # 3. OFI plugin
 if [ -f "$OFI_DIR/lib/libnccl-net-ofi.so" ]; then ok "3 aws-ofi-nccl: $OFI_DIR/lib/libnccl-net-ofi.so"
-elif [ -f "$BASE_IMG" ]; then todo "3 aws-ofi-nccl not built"; next "./scripts/03_build_ofi_plugin.sh 2>&1 | tee results/ofi-build.log | tail -3"
+elif [ $BASE_READY = 1 ]; then todo "3 aws-ofi-nccl not built"; next "./scripts/03_build_ofi_plugin.sh 2>&1 | tee results/ofi-build.log | tail -3"
 else todo "3 aws-ofi-nccl: needs the base image first"; fi
 
 # 4. benchmark container
@@ -41,7 +42,7 @@ if pgrep -u "$(id -u)" -f 02_build_container.sh >/dev/null; then todo "4 contain
 elif [ -f "$IMG" ] && grep -q "BUILD_EXIT=0" results/build.log 2>/dev/null; then ok "4 container: $IMG ($(du -h "$IMG" | cut -f1))"
 elif [ -f "$IMG" ]; then ok "4 container: $IMG (no build log here)"
 elif grep -q "BUILD_EXIT=" results/build.log 2>/dev/null; then bad "4 container build failed: $(grep -m1 -E 'Error|error' results/build.log | cut -c1-80)"; next "tail -n30 results/build.log"
-elif [ -f "$BASE_IMG" ]; then todo "4 container not built"; next "setsid nohup ./scripts/02_build_container.sh > results/build.log 2>&1 < /dev/null &"
+elif [ $BASE_READY = 1 ]; then todo "4 container not built"; next "setsid nohup ./scripts/02_build_container.sh > results/build.log 2>&1 < /dev/null &"
 else todo "4 container: needs the base image first"; fi
 
 # 5. network check
