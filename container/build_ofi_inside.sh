@@ -15,12 +15,13 @@ apt-get install -y -qq --no-install-recommends libhwloc-dev autoconf automake li
 FABLINK=/tmp/fablink && rm -rf $FABLINK && mkdir -p $FABLINK
 ln -s "$CRAY_LIBFABRIC/lib64/libfabric.so.1" $FABLINK/libfabric.so
 ls -la "$CRAY_LIBFABRIC/lib64/" /hostlibs/
-export LD_LIBRARY_PATH=$CRAY_LIBFABRIC/lib64:/hostlibs:${LD_LIBRARY_PATH:-}
-export LDFLAGS="-L$FABLINK -Wl,-rpath-link,/hostlibs -Wl,-rpath-link,$CRAY_LIBFABRIC/lib64"
-
+# Clone BEFORE pointing LD_LIBRARY_PATH at /hostlibs: it holds the host's libcurl/libnghttp2,
+# which break the container's git ("symbol lookup error" in git-remote-https).
 cd /tmp && rm -rf aws-ofi-nccl
 git clone --depth 1 --branch "$OFI_VERSION" https://github.com/aws/aws-ofi-nccl.git
 cd aws-ofi-nccl
+export LD_LIBRARY_PATH=$CRAY_LIBFABRIC/lib64:/hostlibs:${LD_LIBRARY_PATH:-}
+export LDFLAGS="-L$FABLINK -Wl,-rpath-link,/hostlibs -Wl,-rpath-link,$CRAY_LIBFABRIC/lib64"
 ./autogen.sh
 if ! ./configure --prefix=/out \
       --with-libfabric="$CRAY_LIBFABRIC" --with-cuda=/usr/local/cuda \

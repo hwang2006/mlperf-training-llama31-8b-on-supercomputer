@@ -37,12 +37,13 @@ Track 1 is *not* a compliant submission: a submission needs 10 runs, the referen
 | 128 | 512 | **13.77** | GBS 128, TP1·CP4, bucket 2e9, LR 1e-3 | 14.11 | same |
 | 256 | 1,024 | **15.27** | GBS 128, TP4·CP2, bucket 2e9, LR 1e-3 | 17.15 | GBS 256, TP4·CP1, bucket 2e9, LR 1e-3 |
 | 512 | 2,048 | 21.14 | GBS 128, TP4·CP4, bucket 2e9, LR 1e-3 | **19.11** | GBS 512, TP4·CP1, bucket 2e9, LR 1e-3 |
-| 1,024 | 4,096 | — | | (pending) | GBS 1,024, TP4·CP2, bucket 2e9 |
+| 1,024 | 4,096 | — | | 30.40 | GBS 1,024, TP4·CP2 (MINIBS 2), bucket 2e9, LR 1e-3 |
 
 From 64 to 256 nodes Track 1 matched or beat Track 2: the evaluation schedule is worth less
 than one minute, and GBS 128 stayed the most sample-efficient batch that still scales. Track 2
 only wins at 512 nodes, where GBS 128 forces CP across four nodes while GBS 512 does not.
-128 nodes is the sweet spot either way.
+128 nodes is the sweet spot either way; 1,024 nodes (4,096 GPUs) took 30.4 min because doubling
+GBS from 512 to 1,024 added 74% more samples while throughput rose only 23% (911 → 1,121 samples/s).
 
 ![TTT and throughput per node count](img/ttt_and_throughput.png)
 
@@ -94,6 +95,7 @@ reach the target grow almost as fast as the batch:
 | 128 | 307k–393k, median ~330k | ~1.45× | 346k (LR 2e-3) |
 | 256 | 516k–522k (LR 2e-3: 578k) | ~1.6× | none |
 | 512 | 0.93M–1.15M (4 runs) | ~1.9× | none |
+| 1,024 | 1.66M (1 run) | ~1.7× | none |
 
 ![throughput by GBS](img/throughput_by_gbs.png)
 

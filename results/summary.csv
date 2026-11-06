@@ -80,3 +80,5 @@ job_id,nodes,gpus,gbs,tp,cp,minibs,lr,warmup_steps,bucket_size,netprofile,eval_s
 1210114,256,1024,128,4,2,1,0.001,256,2000000000,cscs,mlperf,success,15.27,319488,,362.21,,best Track 1 at 256 nodes
 1210353,128,512,128,4,1,1,0.001,256,2000000000,cscs,mlperf,success,16.61,307200,,318.16,,TP4 slower than TP1·CP4 at 128 nodes
 1210354,512,2048,128,4,4,1,0.001,256,2000000000,cscs,mlperf,success,21.14,331776,,273.71,,"loss spike 3.29->6.85 at 295k samples, recovered"
+1210112,1024,4096,1024,4,2,2,0.001,128,2000000000,cscs,relaxed,success,30.4,1658880,3.2721,1120.96,909.59,"1,024 nodes: throughput 1.23x of 512 nodes, samples 1.74x"
+1196515,8,32,32,1,1,1,0.0004,20,768000000,cscs-nordzv,none,nan,,,,,,"8-node stress test on node0319-0326, NaN from the first step without CP"

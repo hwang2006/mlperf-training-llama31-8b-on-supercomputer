@@ -2,10 +2,10 @@
 
 Reproducible recipe for the **MLPerf Training Llama 3.1 8B pretraining** benchmark on KISTI's
 6th supercomputer **Hangang** (NVIDIA GH200, HPE Slingshot), using the NVIDIA MLPerf Training
-v6.0 implementation, from 1 node (4 GPUs) to 512 nodes (2,048 GPUs).
+v6.0 implementation, from 1 node (4 GPUs) to 1,024 nodes (4,096 GPUs).
 
 **Best time-to-train: 13.8 min on 128 nodes (512 GH200)** with the MLPerf evaluation schedule.
-Every scale from 1 to 512 nodes reached the MLPerf quality target (validation log perplexity < 3.3).
+Every scale from 1 to 1,024 nodes reached the MLPerf quality target (validation log perplexity < 3.3).
 
 ![Track 1 vs Track 2](docs/img/ttt_tracks.png)
 
@@ -38,13 +38,34 @@ E4M3/E5M2, tensorwise scaling) on a BF16 base, as NVIDIA's Hopper submissions do
 
 | Item | Value |
 |---|---|
-| Account | Hangang account with access to the `normal` (GH200) partition and a valid `--comment` (`showappl`) |
-| Scratch space | ~100 GB data (84 GB C4 + validation + tokenizer), ~25 GB containers |
-| Time | About 2-3 h of setup (downloads and builds), mostly unattended |
+| Account | Hangang account allowed to submit to a GH200 partition. Site policy decides per group: one test account could use only `5thEx`. All GH200 partitions (`normal`, `natStr`, `5thEx`, `intTest`) have the same nodes |
+| `--comment` | A valid `field=...;appl=...` pair (`showappl`); the default `field=efficientai;appl=megatron-lm` is valid |
+| Scratch space | ~150 GB: 84 GB C4 data, ~30 GB tokenizer download (weights can be deleted), ~20 GB containers |
+| Time | Setup is mostly waiting on downloads, see the table below |
+
+Measured on Hangang with a fresh account (2026-11-06):
+
+| Step | Time |
+|---|---|
+| Data download (84 GB from MLCommons) | several hours (0.7-8 MB/s from the login node); copying from another user's `/scratch`: 2 min |
+| Base image import (NGC, batch job) | 15-60 min |
+| aws-ofi-nccl build | 5 min |
+| Benchmark container build | 11-70 min |
+| 2-node NCCL check | 5 min |
+| 4-node smoke test | 6-10 min |
 
 ## Quick start
 
 Run everything from a directory under `/scratch` (Hangang only accepts jobs submitted there).
+`./scripts/check_setup.sh` prints what is done and the next command at any point:
+
+```
+  [ OK ] 0 sources: .../third_party/v60/NVIDIA/benchmarks/llama31_8b/implementations/nemo
+  [ OK ] 1 data: /scratch/<user>/mlperf-llama31/data/llama3_1_8b_preprocessed_c4_dataset
+  [ .. ] 2 base image: import job running (6.2G downloaded)
+  ...
+next: wait for the kv6-import job (squeue -u $USER)
+```
 
 ### 0. Clone and configure
 
@@ -52,41 +73,79 @@ Run everything from a directory under `/scratch` (Hangang only accepts jobs subm
 cd /scratch/$USER
 git clone https://github.com/hwang2006/mlperf-training-llama31-8b-on-supercomputer.git
 cd mlperf-training-llama31-8b-on-supercomputer
-vi env.sh        # SLURM_COMMENT (required), DATA_ROOT, CONT_DIR; review EXCLUDE_NODES
 source env.sh
+for P in normal natStr 5thEx intTest; do printf "%-8s " $P; sbatch --test-only -p $P -N 1 --gres=gpu:4 -t 10 --comment="$SLURM_COMMENT" --wrap=hostname 2>&1 | tail -1; done
 ```
 
-### 1. Upstream code and data (login node)
+Use a partition that answers `Job ... to start at ...` (the others print `allocation failure`)
+and put it in `env.local.sh`, your personal settings file (also for `SLURM_COMMENT`,
+`DATA_ROOT`, `CONT_DIR`; git ignores it, so `git pull` keeps it):
 
 ```bash
-./scripts/00_fetch_sources.sh            # NVIDIA v6.0 implementation + Cisco H200 reference logs
+echo 'export SLURM_PARTITION=5thEx' >> env.local.sh      # your partition; env.local.sh is not tracked by git
+source env.sh && echo "$SLURM_PARTITION | $SLURM_COMMENT | $DATA_ROOT | $CONT_DIR"
+```
+
+### 1. Sources and data (login node)
+
+```bash
+./scripts/00_fetch_sources.sh | tail -2           # NVIDIA v6.0 implementation, patched callback
 setsid nohup ./scripts/04_prepare_data.sh > results/data-download.log 2>&1 < /dev/null &
 ```
 
-Data download takes an hour or more; it ends with `DATA_READY` after checking file sizes.
-`setsid nohup … &` detaches the job from your terminal so it keeps running after logout.
+`setsid nohup … &` detaches the job from your terminal; the shell prints `[1]+ Done` at once,
+but the download keeps running (`ps -u $USER | grep -E "prepare_data|wget"`). It ends with
+`DATA_READY` after checking file sizes. If someone on Hangang already has the data and lets
+you read it, copying is much faster:
+
+```bash
+S=/scratch/<other user>/mlperf-llama31
+mkdir -p "$PREPROC_DATA" "$TOKENIZER"
+cp -a $S/data/llama3_1_8b_preprocessed_c4_dataset/. "$PREPROC_DATA/"
+cp -a $S/tokenizer/llama3_1_8b_tokenizer_only/. "$TOKENIZER/"
+./scripts/04_prepare_data.sh --verify             # DATA_READY
+```
 
 ### 2. Containers
 
+**2a.** Import the NGC base image (batch job on a GPU node):
+
 ```bash
-sbatch --comment="$SLURM_COMMENT" scripts/01_import_base_image.sbatch     # NGC 26.04 + driver check (~15 min)
-./scripts/03_build_ofi_plugin.sh 2>&1 | tee results/ofi-build.log        # aws-ofi-nccl for Slingshot (~5 min)
-setsid nohup ./scripts/02_build_container.sh > results/build.log 2>&1 < /dev/null &   # ~40-70 min
+sbatch -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" scripts/01_import_base_image.sbatch
 ```
 
-Check: the import log shows `available True` and `cc (9, 0)`; the plugin log ends with
-`OFI_BUILD_OK`; the build log contains `FINAL torch …` and `BUILD_EXIT=0`.
+Wait until the job has left `squeue` and its log `results/kv6-import-<job>.log` ends with
+`CHECK_EXIT=0` (it also prints `available True` and `cc (9, 0)`). The log stays at
+`Downloading 78 missing layers...` for most of the time; `du -sh $ENROOT_CACHE_PATH` shows
+progress. If the job times out, submit it again: downloaded layers are reused.
+
+**2b.** Only after 2a has finished, build the Slingshot plugin and the benchmark container:
+
+```bash
+./scripts/03_build_ofi_plugin.sh 2>&1 | tee results/ofi-build.log | tail -3     # OFI_BUILD_OK
+setsid nohup ./scripts/02_build_container.sh > results/build.log 2>&1 < /dev/null &
+```
+
+The build log ends with `BUILD_EXIT=0` and `$CONT_DIR` then holds
+`kv6-nv60-llama31-8b-arm64.sqsh` (~10 GB). Both scripts stop at once with
+`Base image not found` if 2a is not done yet.
 
 ### 3. Network check (2 nodes, ~5 min)
 
 ```bash
-sbatch -N 2 -p normal --comment="$SLURM_COMMENT" slurm/nccl_test.sbatch
-cat $(ls -t results/kv6-nccl-*.log | head -1)
+sbatch -N 2 -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" slurm/nccl_test.sbatch
+grep -E "^##########|world=|allreduce +(512|2048) MB" $(ls -t results/kv6-nccl-*.log | head -1)
 ```
 
-Expect about 280-300 GB/s bus bandwidth at 512-2,048 MB with `Using network Libfabric`.
+| Variant | Expected 2 GB all-reduce bus bandwidth |
+|---|---|
+| C1-C3 (Slingshot CXI) | ~297 GB/s |
+| C4 (`OFI_NCCL_PROTOCOL=RDMA`) | ~12 GB/s (falls back to TCP on Hangang) |
+| A (TCP reference) | ~10 GB/s |
 
-### 4. Smoke test (4 nodes, ~6 min)
+Full output per variant is in `results/nccl-<job>/`.
+
+### 4. Smoke test (4 nodes, ~6-10 min)
 
 ```bash
 ./submit.sh 4 MAX_STEPS=200 TIME=00:40:00
@@ -94,11 +153,14 @@ python3 tools/ttq_status.py results/runs/kv6-l8b-<job>.out
 ```
 
 Expect a first loss of ~12.58 and about 24 training samples/s. `"status": "aborted"` is normal
-for a `MAX_STEPS` run.
+for a `MAX_STEPS` run. If one rank fails with `CUDA out of memory` while the others are fine,
+a GPU on that node was not empty (seen once on node1802); exclude the node for your runs:
+`EXTRA_EXCLUDE=node1802 ./submit.sh 4 MAX_STEPS=200 TIME=00:40:00`.
 
 ### 5. Time-to-train runs
 
 ```bash
+./submit.sh 4                                      # ~140 min
 ./submit.sh 128 GBS=128 TP=1 CP=4 LR=0.001 WARMUP_STEPS=256 BUCKET_SIZE=2000000000 \
             MAX_STEPS=1200000 TIME=00:40:00 NETPROFILE=cscs      # best: ~14 min
 setsid nohup ./scripts/submit_queue.sh recipes/best_per_scale.txt > results/queue.log 2>&1 < /dev/null &
@@ -150,11 +212,12 @@ Summary of [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md); the scripts alrea
 2. Without `--cpus-per-task`, NCCL reaches 40 GB/s instead of ~300 GB/s.
 3. Task 0 is not always on the first node of the sorted node list.
 4. Collectives can hang silently; the CSCS Slingshot settings fix this up to 64 nodes.
-5. Some nodes produced NaN loss in runs with context parallelism across nodes; they are excluded in `env.sh`.
+5. Some nodes (most likely node0320-0324) produced NaN loss from the first step; they are excluded in `env.sh`.
 6. One node needs TP=2 (96 GB GPUs); builds on login nodes need `OPENBLAS_NUM_THREADS=1`.
 7. GBS ≥ 256 timed out during initialisation (dataset index for `MAX_STEPS × GBS` samples); `MAX_STEPS` is now capped.
 8. One hang came with CXI `UNDELIVERABLE` send errors from three neighbouring nodes; they are excluded.
 9. The best layout changes with scale: CP-heavy up to 128 nodes, TP4 with large gradient buckets from 256 nodes.
+10. Each group may submit only to some GH200 partitions; one GPU on node1802 had memory already in use.
 
 ## Repository layout
 
@@ -165,6 +228,7 @@ configs/config_GH200_8b.sh     GH200 config on top of NVIDIA's 8B configs
 slurm/run_ttq.sbatch           time-to-train job
 slurm/nccl_test.sbatch         2-node NCCL bandwidth and CXI profile check
 scripts/00-04_*                fetch code, import/build containers, build OFI plugin, get data
+scripts/check_setup.sh         what is done, what to run next
 scripts/submit_queue.sh        submit a recipe file within the 5-job limit
 container/                     build steps run inside enroot
 recipes/                       validated commands and hyperparameters

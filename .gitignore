@@ -12,3 +12,4 @@ __pycache__/
 patches/
 ._dbindex_/
 results/queue_*.txt
+env.local.sh

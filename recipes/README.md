@@ -31,6 +31,7 @@ it `MAX_STEPS` is capped for GBS ≥ 128 (shorter init, same training).
 | 128 | GBS 128, TP1·CP4, bucket 2e9, LR 1e-3, eval from 258,048 every 3,072 | 14.1 | 328,704 |
 | 256 | GBS 256, TP4·CP1, bucket 2e9, LR 1e-3, eval from 307,200 every 6,144 | 17.2 | 577,536 |
 | 512 | GBS 512, TP4·CP1, bucket 2e9, LR 1e-3, eval from 491,520 every 6,144 | 19.1 | 952,320 |
+| 1,024 | GBS 1,024, TP4·CP2, bucket 2e9, LR 1e-3, eval from 1,474,560 every 12,288 | 30.4 | 1,658,880 |
 
 ## Hyperparameters
 
@@ -43,6 +44,7 @@ it `MAX_STEPS` is capped for GBS ≥ 128 (shorter init, same training).
 | 128 | 1e-3 / 256 (1.5e-3: 326k, 2e-3: 344k–402k) | 307k–393k, median ~330k | 2e-3 / 32,768 / 345,907 |
 | 256 | 1e-3 / 128 (8e-4: 522k, 2e-3: 578k, 3e-3: 762k) | 516k–578k | none |
 | 512 | 1e-3 / 128 | 0.93M–1.15M | none |
+| 1,024 | 1e-3 / 128 | 1.66M | none |
 
 ## Parallelism and buckets on Hangang (4 GPUs per node)
 

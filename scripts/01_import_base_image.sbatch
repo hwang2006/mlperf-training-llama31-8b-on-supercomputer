@@ -1,13 +1,14 @@
 #!/bin/bash
 # Import nvcr.io/nvidia/pytorch:26.04-py3 (arm64) as squashfs, then check on a GH200
 # compute node that the host driver can run this CUDA 13.x container.
-#   sbatch scripts/01_import_base_image.sbatch
+# Usage: source env.sh; then submit with -p "$SLURM_PARTITION" --comment="$SLURM_COMMENT" (see README)
+# The NGC download took 15-60 min on Hangang. Layers are cached in $ENROOT_CACHE_PATH, so after a
+# TIMEOUT simply resubmit: finished layers are not downloaded again.
 #SBATCH -J kv6-import
-#SBATCH -p normal
 #SBATCH -N 1
 #SBATCH --exclusive
 #SBATCH --gres=gpu:4
-#SBATCH --time=02:00:00
+#SBATCH --time=03:00:00
 #SBATCH --comment="field=efficientai;appl=megatron-lm"
 #SBATCH -o results/kv6-import-%j.log
 

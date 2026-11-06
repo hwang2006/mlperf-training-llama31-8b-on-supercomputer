@@ -13,6 +13,7 @@
 #   NETMODE=C|A        C = Slingshot CXI (default), A = TCP sockets
 #   SEED=<int>  NCCL_DEBUG=INFO|WARN  TIME=HH:MM:SS (default depends on NODES)
 #   WATCH=0            do not start tools/watch_job.sh
+#   (environment) EXTRA_EXCLUDE=nodeA,nodeB adds nodes to EXCLUDE_NODES from env.sh
 #   STALL=<minutes>    watchdog stall limit (default 5)
 #
 # Validated recipes: recipes/README.md.  Examples:
